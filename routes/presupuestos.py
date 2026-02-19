@@ -16,6 +16,26 @@ os.makedirs(PRESUPUESTOS_DIR, exist_ok=True)
 def vista_presupuestos():
     return render_template('presupuestos.html')
 
+@bp.route('/api/historial', methods=['GET'])
+def historial():
+    try:
+        files = []
+        for f in os.listdir(PRESUPUESTOS_DIR):
+            if f.endswith('.pdf'):
+                path = os.path.join(PRESUPUESTOS_DIR, f)
+                mtime = os.path.getmtime(path)
+                files.append({
+                    'name': f,
+                    'date': datetime.fromtimestamp(mtime).strftime('%d/%m/%Y %H:%M:%S'),
+                    'timestamp': mtime,
+                    'url': f'/static/presupuestos/{f}'
+                })
+        # Sort by newest first
+        files.sort(key=lambda x: x['timestamp'], reverse=True)
+        return jsonify({'success': True, 'archivos': files[:50]}) # Ultimos 50
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @bp.route('/api/generar-pdf', methods=['POST'])
 def generar_pdf():
     data = request.json
