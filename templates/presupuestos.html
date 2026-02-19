@@ -283,6 +283,17 @@
                 <div style="text-align:center; color:#95a5a6; padding: 20px;">El presupuesto está vacío.</div>
             </div>
 
+            <div style="margin-top:20px; border-top:1px dashed #ccc; padding-top:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#7f8c8d; font-weight:bold;">Ajuste Global ($)</span>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="inpAjusteGlobal" value="0"
+                            style="width:100px; padding:5px; text-align:right; border:1px solid #ccc; border-radius:4px;"
+                            onchange="renderCarrito()">
+                    </div>
+                </div>
+            </div>
+
             <div class="cart-total" id="cart_total_display">$ 0.00</div>
 
             <button class="btn-generate" onclick="generarPDF()">📄 Generar PDF</button>
@@ -442,7 +453,10 @@
         `;
         });
 
-        document.getElementById("cart_total_display").innerText = "$ " + total.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+        const ajusteGlobal = parseFloat(document.getElementById("inpAjusteGlobal").value) || 0;
+        const totalFinal = total + ajusteGlobal;
+
+        document.getElementById("cart_total_display").innerText = "$ " + totalFinal.toLocaleString("es-AR", { minimumFractionDigits: 2 });
     }
 
     function generarPDF() {
@@ -463,6 +477,7 @@
             localidad: document.getElementById("cliente_localidad").value,
             cuit: document.getElementById("cliente_cuit").value,
             condicion: document.getElementById("cliente_condicion").value,
+            ajuste_global: parseFloat(document.getElementById("inpAjusteGlobal").value) || 0,
             items: carrito
         };
 

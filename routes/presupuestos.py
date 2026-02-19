@@ -86,9 +86,9 @@ def generar_pdf():
         c.drawString(35, y, "Codigo")
         c.drawString(110, y, "Cant")
         c.drawString(150, y, "Descripcion")
-        c.drawString(400, y, "Precio")
-        c.drawString(460, y, "Ajus.")
-        c.drawString(510, y, "Total")
+        c.drawRightString(440, y, "Precio")
+        c.drawRightString(495, y, "Ajus.")
+        c.drawRightString(550, y, "Total")
         y -= 15
         c.drawString(30, y, "—" * 75)
         
@@ -108,9 +108,9 @@ def generar_pdf():
             c.drawString(35, y, f"{codigo:<10}")
             c.drawString(110, y, f"{cant:.2f}")
             c.drawString(150, y, f"{desc:<35}")
-            c.drawString(400, y, f"{precio:8.2f}")
+            c.drawRightString(440, y, f"{precio:8.2f}")
             if ajus != 0:
-                c.drawString(460, y, f"{ajus:8.2f}")
+                c.drawRightString(495, y, f"{ajus:8.2f}")
             c.drawRightString(550, y, f"{total_item:8.2f}")
             
             y -= 15
@@ -128,10 +128,18 @@ def generar_pdf():
         c.drawString(420, y, "Subtotal")
         c.drawRightString(550, y, f"{subtotal:8.2f}")
         
-        y -= 45
+        y -= 25
+        ajuste_global = float(data.get('ajuste_global', 0))
+        if ajuste_global != 0:
+            c.drawString(420, y, "Ajus. Glob")
+            c.drawRightString(550, y, f"{ajuste_global:8.2f}")
+            y -= 20
+            
+        total_general = subtotal + ajuste_global
+        
         c.drawString(110, y, "Documento no valido como factura")
         c.drawString(420, y, "Total")
-        c.drawRightString(550, y, f"{subtotal:8.2f}")
+        c.drawRightString(550, y, f"{total_general:8.2f}")
         
         c.save()
         
