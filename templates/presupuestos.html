@@ -73,7 +73,7 @@
 
     .row-item {
         display: grid;
-        grid-template-columns: 120px 1fr 100px 90px;
+        grid-template-columns: 120px 1fr 50px 50px 90px 85px;
         align-items: center;
         background: #f8f9fa;
         border-radius: 8px;
@@ -96,6 +96,24 @@
     .desc {
         font-weight: 600;
         font-size: 14px;
+    }
+
+    .stock {
+        text-align: center;
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+    .stock.salon {
+        color: #198754;
+    }
+
+    .stock.zero {
+        color: #dc3545;
+    }
+
+    .stock.depo {
+        color: #0d6efd;
     }
 
     .price {
@@ -385,10 +403,15 @@
                 d.resultados.slice(0, 15).forEach(p => {
                     // Guardar producto en string seguro para pasarlo al boton
                     const prodData = encodeURIComponent(JSON.stringify(p));
+                    const salon = p.stock_salon > 0 ? "stock salon" : "stock zero";
+                    const depo = p.stock_depo > 0 ? "stock depo" : "stock zero";
+
                     c.innerHTML += `
                 <div class="row-item">
                     <div class="sku">${p.sku}</div>
                     <div class="desc">${p.descripcion}</div>
+                    <div class="${salon}" title="Stock Salón">🏢<br>${p.stock_salon}</div>
+                    <div class="${depo}" title="Stock Depósito">📦<br>${p.stock_depo}</div>
                     <div class="price">$ ${fmtPrice(p.precio_final)}</div>
                     <button class="btn-add" onclick="agregarAlCarrito('${prodData}')">AGREGAR</button>
                 </div>`;
