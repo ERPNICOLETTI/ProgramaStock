@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 style="color: #2c3e50; margin: 0;">📚 Historial de Lotes (Picklists)</h1>
+        <a href="/ordenes/" class="btn" style="background: #95a5a6; color: white;">Volver al Dashboard</a>
+    </div>
+
+    <div class="card">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #2c3e50; color: white; text-align: left;">
+                    <th style="padding: 15px;"># ID LOTE</th>
+                    <th style="padding: 15px;">Fecha Creación</th>
+                    <th style="padding: 15px; text-align: center;">Órdenes</th>
+                    <th style="padding: 15px;">Estado Progreso</th>
+                    <th style="padding: 15px; text-align: right;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in picklists %}
+                
+                {# Definimos el color aquí para que el editor no marque error en el style #}
+                {% set bg_color = '#27ae60' if p.progreso == 100 else '#f1c40f' %}
+
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 15px; font-weight: bold; font-size: 1.2rem;">#{{ p.id }}</td>
+                    <td style="padding: 15px;">{{ p.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td style="padding: 15px; text-align: center; font-weight: bold;">{{ p.cant_ordenes }}</td>
+                    <td style="padding: 15px;">
+                        <div style="background: #eee; height: 10px; width: 100px; border-radius: 5px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 10px;">
+                            <div style="height: 100%; width: {{ p.progreso }}%; background: {{ bg_color }};"></div>
+                        </div>
+                        <small style="font-weight: bold;">{{ p.progreso }}%</small>
+                    </td>
+                    <td style="padding: 15px; text-align: right;">
+                        <a href="/ordenes/picklist/ver/{{ p.id }}" class="btn" style="padding: 5px 15px; font-size: 0.9rem; background: #2c3e50; color: white;">
+                            🖨️ Ver / Reimprimir
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="padding: 30px; text-align: center; color: #95a5a6;">
+                        No hay listas generadas aún.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

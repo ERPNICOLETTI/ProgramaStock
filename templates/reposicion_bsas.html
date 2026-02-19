@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Copiamos el estilo responsivo para que sea IDÉNTICO a reposicion.html */
+    @media (max-width: 768px) {
+        .tabla-responsiva thead { display: none; }
+        .tabla-responsiva tbody tr {
+            display: block; margin-bottom: 15px; border: 1px solid #e0e0e0;
+            border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 10px;
+        }
+        .tabla-responsiva td {
+            display: flex; justify-content: space-between; align-items: center; border: none; padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .tabla-responsiva td:last-child { border-bottom: none; }
+        .tabla-responsiva td::before { content: attr(data-label); font-weight: bold; color: #6c757d; font-size: 0.9em; margin-right: 10px; }
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-8">
+            <h2 class="text-warning"><i class="bi bi-truck"></i> Pedido a Sucursal Central</h2>
+            <p class="text-muted small mb-0">Productos sin stock en Salón ni en Depósito.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/reposicion/" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+            <button class="btn btn-primary fw-bold" onclick="imprimirPedido()">
+                <i class="bi bi-printer"></i> Imprimir PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <table class="table table-hover table-striped mb-0 align-middle tabla-responsiva" id="tabla-imprimir">
+                <thead class="table-dark">
+                    <tr>
+                        <th>SKU</th>
+                        <th>Descripción</th>
+                        <th class="text-center">Stock Total</th>
+                        <th class="text-center" style="width: 100px;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in sugeridos %}
+                    <tr>
+                        <td class="fw-bold text-danger" data-label="SKU">{{ prod.sku }}</td>
+                        <td data-label="Descripción">{{ prod.descripcion }}</td>
+                        <td class="text-center" data-label="Stock Total">
+                            <span class="badge bg-danger">{{ prod.INVACT + prod.INVPEN }}</span>
+                        </td>
+                        <td class="text-center" data-label="Acción">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="ocultarBsAs('{{ prod.sku }}', this)" title="Ocultar de esta lista">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-success">
+                            <h4><i class="bi bi-check-circle"></i> Todo excelente</h4>
+                            <p>No hay quiebres de stock totales.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm bg-light mb-5">
+        <div class="card-header bg-transparent border-0">
+            <button class="btn btn-link text-decoration-none text-secondary p-0 fw-bold" type="button" onclick="toggleOcultosManual()">
+                <i class="bi bi-chevron-right" id="icono-toggle"></i> Ver Productos Ignorados ({{ ocultos|length }})
+            </button>
+        </div>
+        
+        <div id="bloque-ocultos" style="display: none;">
+            <div class="card-body p-0">
+                <table class="table table-sm table-bordered mb-0 bg-white align-middle tabla-responsiva">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>SKU</th>
+                            <th>Descripción</th>
+                            <th class="text-center" style="width: 100px;">Restaurar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prod in ocultos %}
+                        <tr>
+                            <td class="text-muted fw-bold" data-label="SKU">{{ prod.sku }}</td>
+                            <td class="text-muted" data-label="Descripción">{{ prod.descripcion }}</td>
+                            <td class="text-center" data-label="Acción">
+                                <button class="btn btn-sm btn-outline-success" onclick="mostrarBsAs('{{ prod.sku }}')" title="Volver a poner en lista">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-3 text-muted small">No hay productos ocultos en esta sección.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- FUNCIÓN MANUAL PARA ABRIR/CERRAR OCULTOS (IGUAL A REPOSICION) ---
+    function toggleOcultosManual() {
+        const bloque = document.getElementById('bloque-ocultos');
+        const icono = document.getElementById('icono-toggle');
+        
+        if (bloque.style.display === 'none') {
+            bloque.style.display = 'block';
+            icono.classList.remove('bi-chevron-right');
+            icono.classList.add('bi-chevron-down');
+        } else {
+            bloque.style.display = 'none';
+            icono.classList.remove('bi-chevron-down');
+            icono.classList.add('bi-chevron-right');
+        }
+    }
+
+    // --- ACCIONES (OCULTADO INSTANTÁNEO) ---
+    function ocultarBsAs(sku, btnElement) {
+        // 1. Borrar visualmente YA (para que sea rápido)
+        const row = btnElement.closest('tr');
+        row.remove();
+
+        // 2. Avisar al servidor en segundo plano
+        fetch('/reposicion/ocultar_bsas/' + encodeURIComponent(sku), { method: 'POST' })
+            .catch(err => {
+                console.error("Error al ocultar:", err);
+                alert("Error de conexión. Recarga la página.");
+            });
+    }
+
+    function mostrarBsAs(sku) {
+        fetch('/reposicion/mostrar_bsas/' + encodeURIComponent(sku), { method: 'POST' })
+            .then(() => location.reload());
+    }
+
+    // --- IMPRESIÓN ---
+    function imprimirPedido() {
+        const fecha = new Date().toLocaleDateString();
+        // Clonamos para manipular el HTML antes de imprimir
+        let tablaHtml = document.getElementById('tabla-imprimir').cloneNode(true);
+        
+        // Limpiamos la columna de botones del clon
+        tablaHtml.querySelectorAll('tr').forEach(row => {
+            if(row.cells.length > 0) row.deleteCell(-1); 
+        });
+
+        const ventana = window.open('', '', 'height=900,width=800');
+        ventana.document.write(`
+            <html>
+            <head>
+                <title>Pedido a Sucursal - ${fecha}</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 40px; font-family: sans-serif; }
+                    h2 { border-bottom: 2px solid #ffc107; padding-bottom: 10px; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #f8f9fa !important; border: 1px solid #000; padding: 10px; }
+                    td { border: 1px solid #000; padding: 8px; }
+                    .cant-col { width: 100px; } 
+                </style>
+            </head>
+            <body>
+                <div class="text-center">
+                    <h2>📦 Pedido de Reposición a Central</h2>
+                    <p><strong>Fecha:</strong> ${fecha}</p>
+                </div>
+                
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Descripción</th>
+                            <th class="text-center">Stock</th>
+                            <th class="cant-col">Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `);
+
+        // Usamos los datos originales de la tabla visible
+        const filas = document.querySelectorAll('#tabla-imprimir tbody tr');
+        let hayDatos = false;
+        
+        filas.forEach(fila => {
+            const cols = fila.querySelectorAll('td');
+            if (cols.length > 2 && !fila.innerText.includes('Todo excelente')) {
+                ventana.document.write(`
+                    <tr>
+                        <td><b>${cols[0].innerText}</b></td>
+                        <td>${cols[1].innerText}</td>
+                        <td class="text-center">${cols[2].innerText}</td>
+                        <td></td> 
+                    </tr>
+                `);
+                hayDatos = true;
+            }
+        });
+
+        if (!hayDatos) {
+            ventana.document.write('<tr><td colspan="4" class="text-center">No hay ítems pendientes.</td></tr>');
+        }
+
+        ventana.document.write(`
+                    </tbody>
+                </table>
+                <div class="mt-5 pt-3 border-top">
+                    <p>Observaciones:</p>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); }
+                <\/script>
+            </body>
+            </html>
+        `);
+        ventana.document.close();
+    }
+</script>
+{% endblock %}

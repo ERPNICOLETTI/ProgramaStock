@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 400px; margin-top: 50px;">
+    <div class="card" style="text-align: center; border-top: 5px solid #2c3e50;">
+        <h2 style="color: #2c3e50;">🔐 Acceso Admin</h2>
+        <p style="color: #7f8c8d;">Gestión de Envíos y Pagos</p>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background: #e74c3c; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                {{ messages[0] }}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div style="margin-bottom: 20px;">
+                <input type="password" name="password" placeholder="Contraseña..." style="text-align: center; font-size: 1.2rem;" autofocus required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; background: #2c3e50;">Ingresar</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

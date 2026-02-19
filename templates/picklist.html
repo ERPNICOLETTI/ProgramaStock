@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista de Picking {% if picklist %}#{{ picklist.id }}{% endif %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    
+    <style>
+        body { 
+            font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #000; margin: 20px;
+        }
+
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body { margin: 0; }
+            .no-print { display: none; }
+            thead { display: table-header-group; } 
+            tr { page-break-inside: avoid; }
+        }
+
+        /* BARRA SUPERIOR NUEVA (Solo pantalla) */
+        .top-nav {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: -20px -20px 20px -20px; /* Para que ocupe todo el ancho */
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header { 
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-bottom: 15px; border-bottom: 3px solid #000; padding-bottom: 5px;
+        }
+        h1 { margin: 0; font-size: 24px; text-transform: uppercase; font-weight: 900; }
+        .fecha { font-size: 14px; font-weight: bold; }
+        .batch-number { font-size: 30px; font-weight: 900; border: 3px solid black; padding: 5px 15px; background: #eee; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
+        th { background-color: #f2f2f2; text-transform: uppercase; font-size: 12px; }
+        .text-center { text-align: center; }
+        
+        .barcode-cell { padding: 10px 5px !important; } 
+        .barcode { max-height: 35px; width: auto; }
+        
+        /* Estilos botones */
+        .actions { margin-top: 20px; text-align: center; }
+        .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; text-decoration: none; display: inline-block;}
+        .btn-green { background: #28a745; }
+        .btn-grey { background: #6c757d; }
+        .btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+
+    <div class="no-print top-nav">
+        <button onclick="history.back()" class="btn btn-grey">⬅ Volver</button>
+        
+        <div style="font-weight: bold; font-size: 1.1em; color: #555;">
+            {% if picklist %} Visualizando Lote #{{ picklist.id }} {% else %} Vista Previa de Picklist {% endif %}
+        </div>
+        
+        <a href="{{ url_for('ordenes.dashboard') }}" class="btn btn-grey" style="font-size: 12px;">Ir a Dashboard</a>
+    </div>
+
+    <div class="header">
+        <div>
+            <h1>Lista de Picking</h1>
+            <div class="fecha">Fecha: <span id="fecha-hora">{{ picklist.fecha_creacion.strftime('%d/%m/%Y %H:%M') if picklist else 'AHORA' }}</span></div>
+            <div>Total Items: <strong>{{ total_items }}</strong></div>
+        </div>
+        <div>
+            {% if picklist %}
+                <div class="batch-number">LOTE #{{ picklist.id }}</div>
+            {% else %}
+                <div class="batch-number" style="border-style: dashed; color: #666;">VISTA PREVIA</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th style="width: 15%;">SKU</th>
+                <th class="text-center" style="width: 10%;">Cant.</th>
+                <th>Descripción</th>
+                <th class="text-center" style="width: 25%;">Código de Barra</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td><strong>{{ item.sku }}</strong></td>
+                
+                <td class="text-center font-weight-bold" style="font-size: 1.4em;">
+                    {{ item.cantidad }}
+                </td>
+                
+                <td>{{ item.descripcion }}</td>
+                
+                <td class="text-center barcode-cell">
+                    <svg class="barcode"
+                        jsbarcode-value="{{ item.sku }}"
+                        jsbarcode-format="CODE128"
+                        jsbarcode-width="{{ '3' if item.sku|length < 6 else ('2' if item.sku|length < 10 else '1.5') }}"
+                        jsbarcode-height="28"
+                        jsbarcode-displayValue="false"
+                        jsbarcode-margin="5">
+                    </svg>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="no-print actions">
+        {% if not picklist %}
+            <button onclick="generarYProcesar()" class="btn btn-green">Confirmar y Generar Lote</button>
+        {% else %}
+            <button onclick="window.print()" class="btn">🖨️ Imprimir</button>
+            <a href="{{ url_for('picklist.historial_picklist') }}" class="btn btn-grey">Historial</a>
+        {% endif %}
+    </div>
+
+    <script>
+        var ordenesIds = JSON.parse('{{ ordenes_ids | tojson | safe }}');
+    </script>
+
+    <script>
+        JsBarcode(".barcode").init();
+
+        var isPreviewStr = "{{ 'SI' if not picklist else 'NO' }}";
+        const esVistaPrevia = (isPreviewStr === "SI");
+
+        if (esVistaPrevia) {
+            const ahora = new Date();
+            const opciones = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+            const elemFecha = document.getElementById('fecha-hora');
+            if(elemFecha) elemFecha.innerText = ahora.toLocaleDateString('es-AR', opciones);
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('auto_print') === 'true') {
+            window.onload = function() {
+                setTimeout(function() {
+                    window.print();
+                }, 800);
+            };
+        }
+
+        function generarYProcesar() {
+            if (!ordenesIds || ordenesIds.length === 0) { 
+                alert("No hay órdenes disponibles."); 
+                return; 
+            }
+            
+            if(!confirm("⚠️ ¿Generar Picklist?\n\nLas órdenes pasarán a 'EN PREPARACIÓN'.")) return;
+
+            fetch('/ordenes/picklist/confirmar-batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ordenesIds })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if(data.success) {
+                    var iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = data.print_url;
+                    document.body.appendChild(iframe);
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(e => alert("Error de conexión: " + e));
+        }
+    </script>
+</body>
+</html>

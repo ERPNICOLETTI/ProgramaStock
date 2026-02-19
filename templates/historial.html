@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    .historial-container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 15px; border-bottom: 2px solid #eee; color: #7f8c8d; font-size: 0.9rem; }
+    td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    
+    /* COLORES DE TIPO */
+    .type-ingreso { color: #27ae60; font-weight: bold; }
+    .type-egreso { color: #c0392b; font-weight: bold; }
+    .type-transf { color: #f39c12; font-weight: bold; }
+    .type-manual { color: #2980b9; font-weight: bold; }
+</style>
+
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 style="color: #2c3e50; margin: 0;">📜 Historial de Movimientos</h1>
+        <a href="/ordenes/" class="btn" style="background: #95a5a6; color: white;">Volver al Dashboard</a>
+    </div>
+
+    <div class="historial-container">
+        <table>
+            <thead>
+                <tr>
+                    <th># ID</th>
+                    <th>Fecha</th>
+                    <th>Tipo / Origen</th>
+                    <th>Cliente / Ref</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in ordenes %}
+                <tr>
+                    <td style="font-family: monospace; font-weight: bold; color: #555;">{{ o.id }}</td>
+                    <td>
+                        <div>{{ o.fecha_creacion.strftime('%d/%m/%Y') }}</div>
+                        <small style="color: #95a5a6;">{{ o.fecha_creacion.strftime('%H:%M') }}</small>
+                    </td>
+                    <td>
+                        {% if 'INGRESO' in o.origen %} <span class="type-ingreso">📥 INGRESO</span>
+                        {% elif 'EGRESO' in o.origen %} <span class="type-egreso">📤 EGRESO</span>
+                        {% elif 'TRANSFERENCIA' in o.origen %} <span class="type-transf">🚛 TRANSFERENCIA</span>
+                        {% else %} <span class="type-manual">🛒 {{ o.origen }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="font-weight: bold; color: #2c3e50;">{{ o.cliente_nombre or '-' }}</div>
+                        
+                        {% if o.nro_factura %}
+                            <div style="color: #2980b9; font-weight: bold; font-size: 0.85rem;">FC: {{ o.nro_factura }}</div>
+                        {% else %}
+                            <small style="color: #7f8c8d;">{{ o.numero_orden }}</small>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="/pickeo/orden/{{ o.id }}" class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #ecf0f1; color: #333;">Ver 👁️</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

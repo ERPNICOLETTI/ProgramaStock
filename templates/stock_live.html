@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+body { background:#f3f4f6; }
+
+.search-box {
+    max-width: 900px;
+    margin: 0 auto 25px;
+}
+
+.search-box input {
+    font-size: 22px;
+    font-weight: 600;
+    padding: 18px;
+}
+
+.search-box button {
+    padding: 0 28px;
+    font-weight: 700;
+}
+
+.results {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.header-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 120px 120px 160px;
+    align-items: center;
+    padding: 8px 18px;
+    margin-bottom: 10px;
+    color: #6c757d;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+
+.row-item {
+    display: grid;
+    grid-template-columns: 140px 1fr 120px 120px 160px;
+    align-items: center;
+    background: white;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.04);
+}
+
+.sku {
+    font-family: monospace;
+    background: #eef1f4;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: inline-block;
+    margin: 0 auto;
+}
+
+
+.desc {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.stock {
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.stock.salon { color:#198754; }
+.stock.zero { color:#dc3545; }
+.stock.depo { color:#0d6efd; }
+
+.price {
+    text-align: right;
+    font-size: 22px;
+    font-weight: 900;
+    color:#0d6efd;
+}
+
+.col-center { text-align: center; }
+.col-right  { text-align: right; }
+
+.h-center { text-align: center; }
+.h-right  { text-align: right; }
+
+@media (max-width: 768px) {
+
+    .header-row {
+        display: none;
+    }
+
+    .row-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 16px;
+    }
+
+    .row-item > div {
+        text-align: left !important;
+    }
+
+    .sku {
+        margin: 0;
+        background: #e9ecef;
+    }
+
+    .desc {
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .stock {
+        display: inline-block;
+        margin-right: 12px;
+    }
+
+    .price {
+        font-size: 20px;
+        text-align: left;
+        margin-top: 6px;
+    }
+
+    .row-item .col-center,
+    .row-item .col-right {
+        text-align: left !important;
+    }
+
+    /* compactar el buscador */
+    .search-box input {
+        font-size: 18px;
+        padding: 14px;
+    }
+}
+
+
+</style>
+
+
+<div class="container py-4">
+
+<div class="search-box input-group">
+    <input id="buscador" class="form-control" placeholder="Escanear o escribir producto…" autofocus>
+    <button class="btn btn-primary" onclick="buscar()">Buscar</button>
+</div>
+
+<div class="results">
+
+    <div class="header-row">
+    <div class="h-center">SKU</div>
+    <div>Nombre</div>
+    <div class="h-center">Salón</div>
+    <div class="h-center">Depósito</div>
+    <div class="h-right">Precio</div>
+</div>
+
+
+    <div id="results"></div>
+
+</div>
+
+
+</div>
+
+<script>
+let t=null;
+document.getElementById("buscador").addEventListener("keyup",e=>{
+    clearTimeout(t);
+    if(e.key==="Enter") buscar();
+    t=setTimeout(()=>{ if(buscador.value.length>2) buscar(); },400);
+});
+
+function buscar(){
+    const q=buscador.value.trim();
+    if(q.length<2) return;
+
+    fetch(`/stock/api/buscar?q=${encodeURIComponent(q)}`)
+    .then(r=>r.json())
+    .then(d=>{
+        const c=document.getElementById("results");
+        c.innerHTML="";
+        if(!d.success) return;
+
+        d.resultados.forEach(p=>{
+            const salon = p.stock_salon>0 ? "stock salon" : "stock zero";
+            const depo  = p.stock_depo>0 ? "stock depo" : "stock zero";
+
+            c.innerHTML+=`
+                <div class="row-item">
+                    <div style="text-align:center;"><div class="sku">${p.sku}</div></div>
+                    <div class="desc">${p.descripcion}</div>
+                    <div class="${salon} col-center">${p.stock_salon}</div>
+                    <div class="${depo} col-center">${p.stock_depo}</div>
+                    <div class="price col-right">$${p.precio_final.toLocaleString("es-AR")}</div>
+
+                </div>`;
+        });
+    });
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+.env/
+
+# Bases de datos y archivos locales de la app
+*.db
+*.sqlite3
+pickeo.db
+search_index.db
+
+# Carpetas de datos locales
+/exports/
+/imports/
+orden_actual.txt
+
+# Carpetas macOS o Windows genéricas
+.DS_Store
+Thumbs.db

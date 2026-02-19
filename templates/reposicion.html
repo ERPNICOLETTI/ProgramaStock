@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    @media (max-width: 768px) {
+        .tabla-responsiva thead { display: none; }
+        .tabla-responsiva tbody tr {
+            display: block; margin-bottom: 15px; border: 1px solid #e0e0e0;
+            border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 10px;
+        }
+        .tabla-responsiva td {
+            display: flex; justify-content: space-between; align-items: center; border: none; padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .tabla-responsiva td:last-child { border-bottom: none; }
+        .tabla-responsiva td::before { content: attr(data-label); font-weight: bold; color: #6c757d; font-size: 0.9em; margin-right: 10px; }
+        .item-cant { max-width: 100px !important; }
+        .item-check { transform: scale(1.3); margin-left: 5px; }
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-4 mb-2 mb-md-0">
+            <h2><i class="bi bi-robot"></i> Reposición</h2>
+            <p class="text-muted small mb-0">Gestión de Stock Interno.</p>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="d-flex flex-wrap justify-content-md-end gap-2 align-items-center">
+                <form action="/reposicion/" method="GET" class="d-flex align-items-center bg-light p-1 rounded border">
+                    <span class="small text-muted me-2 ps-2">Ver menos de:</span>
+                    <input type="number" name="umbral" value="{{ umbral_actual }}" 
+                           class="form-control form-control-sm text-center border-0 fw-bold text-primary" 
+                           style="width: 50px; background: transparent;" min="0" onchange="this.form.submit()">
+                </form>
+
+                <a href="/reposicion/pedido_bsas" class="btn btn-warning btn-sm fw-bold">
+                    <i class="bi bi-truck"></i> Pedir a BsAs
+                </a>
+
+                <a href="/reposicion/configuracion" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-gear-fill"></i> Config
+                </a>
+
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSeleccion()">
+                    <i class="bi bi-check-all"></i> Todo
+                </button>
+                
+                <button type="button" id="btn-generar" class="btn btn-success btn-sm" onclick="generarOrden()">
+                    <i class="bi bi-box-seam"></i> Generar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <table class="table table-hover table-striped mb-0 align-middle tabla-responsiva">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center" style="width: 50px;">#</th>
+                        <th>SKU</th>
+                        <th>Descripción</th>
+                        <th class="text-center">Stock Salón</th>
+                        <th class="text-center">En Depósito</th>
+                        <th class="text-center" style="width: 120px;">Traer</th>
+                        <th class="text-center" style="width: 40px;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in sugeridos %}
+                    <tr>
+                        <td class="text-center" data-label="Seleccionar">
+                            <input type="checkbox" class="form-check-input item-check" data-sku="{{ prod.sku }}">
+                        </td>
+                        <td class="fw-bold" data-label="SKU">
+                            {{ prod.sku }}
+                            {% if prod.tiene_regla %}<i class="bi bi-info-circle-fill text-info small"></i>{% endif %}
+                        </td>
+                        <td data-label="Producto">{{ prod.descripcion }}</td>
+                        <td class="text-center" data-label="Stock Salón">
+                            <span class="badge bg-danger">
+                                {{ prod.INVACT|int if prod.INVACT == prod.INVACT|int else prod.INVACT }}
+                            </span>
+
+                        </td>
+                        <td class="text-center" data-label="En Depósito">
+                            <span class="badge bg-success">
+                                {{ prod.INVPEN|int if prod.INVPEN == prod.INVPEN|int else prod.INVPEN }}
+                            </span>
+
+                        </td>
+                        <td class="text-center" data-label="Cantidad">
+                            <input type="number" class="form-control text-center item-cant" value="{{ prod.cantidad_sugerida }}" min="1">
+                        </td>
+                        <td class="text-center" data-label="Opciones">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="ocultarProducto('{{ prod.sku }}')" title="Ocultar">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center py-4 text-muted">Todo ordenado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm bg-light mb-5">
+        <div class="card-header bg-transparent border-0">
+            <button class="btn btn-link text-decoration-none text-secondary p-0 fw-bold" type="button" onclick="toggleOcultosManual()">
+                <i class="bi bi-chevron-right" id="icono-toggle"></i> Ver Productos Ignorados ({{ ocultos|length }})
+            </button>
+        </div>
+        <div id="bloque-ocultos" style="display: none;">
+            <div class="card-body p-0">
+                <table class="table table-sm table-bordered mb-0 bg-white align-middle">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>SKU</th>
+                            <th>Descripción</th>
+                            <th class="text-center" style="width:100px;">Restaurar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prod in ocultos %}
+                        <tr>
+                            <td class="fw-bold text-muted">{{ prod.sku }}</td>
+                            <td class="text-muted">{{ prod.descripcion }}</td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-success" onclick="mostrarProducto('{{ prod.sku }}')">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-2 text-muted small">No hay productos ocultos.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- FUNCIÓN MANUAL PARA ABRIR/CERRAR OCULTOS ---
+    function toggleOcultosManual() {
+        const bloque = document.getElementById('bloque-ocultos');
+        const icono = document.getElementById('icono-toggle');
+        
+        if (bloque.style.display === 'none') {
+            // Si está oculto -> MOSTRAR
+            bloque.style.display = 'block';
+            icono.classList.remove('bi-chevron-right');
+            icono.classList.add('bi-chevron-down');
+        } else {
+            // Si está visible -> OCULTAR
+            bloque.style.display = 'none';
+            icono.classList.remove('bi-chevron-down');
+            icono.classList.add('bi-chevron-right');
+        }
+    }
+
+    // --- FUNCIONES ORIGINALES ---
+    function generarOrden() {
+        const checkboxes = document.querySelectorAll('.item-check:checked');
+        const items = [];
+        if (checkboxes.length === 0) { alert("⚠️ Selecciona al menos un producto."); return; }
+
+        checkboxes.forEach(chk => {
+            const fila = chk.closest('tr');
+            const cant = parseInt(fila.querySelector('.item-cant').value) || 1;
+            items.push({ sku: chk.dataset.sku, cantidad: cant });
+        });
+
+        if (!confirm('¿Generar orden?')) return;
+        const btn = document.getElementById('btn-generar');
+        btn.disabled = true; btn.innerHTML = 'Procesando...';
+
+        fetch('/reposicion/generar_orden', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        }).then(r => r.json()).then(data => {
+            if(data.success) { alert("✅ " + data.mensaje); location.reload(); }
+            else { alert("❌ " + data.mensaje); btn.disabled = false; btn.innerText = 'Generar'; }
+        });
+    }
+
+    function toggleSeleccion() {
+        const c = document.querySelectorAll('.item-check');
+        if(c.length) { const s = !c[0].checked; c.forEach(x => x.checked = s); }
+    }
+    
+    function ocultarProducto(s) { 
+        fetch('/reposicion/ocultar/'+encodeURIComponent(s), {method:'POST'}).then(()=>location.reload()); 
+    }
+    
+    function mostrarProducto(s) { 
+        fetch('/reposicion/mostrar/'+encodeURIComponent(s), {method:'POST'}).then(()=>location.reload()); 
+    }
+</script>
+{% endblock %}

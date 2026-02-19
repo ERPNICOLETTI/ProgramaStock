@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    /* --- ESTILOS GENERALES --- */
+    .progress-wrapper { background: #eee; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+    .progress-bar { height: 100%; width: 0%; transition: width 0.3s; }
+    
+    /* Clases de Color y Estado */
+    .bar-ok { background: #27ae60; } 
+    .bar-pend { background: #f1c40f; }
+    .color-ok { color: #27ae60 !important; } 
+    .color-pend { color: #333 !important; }
+    .row-completa { background: #e8f5e9; }
+    
+    /* Estilo para el número de cantidad */
+    .qty-display { font-weight: bold; font-size: 1.1rem; }
+    
+    /* Badges de Estado */
+    .badge-status { color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+    .st-pendiente { background: #f1c40f; } 
+    .st-embalado { background: #8e44ad; } 
+    .st-listo { background: #e74c3c; } 
+    .st-completa { background: #27ae60; }
+
+    /* Buscador */
+    .search-container { position: relative; margin-bottom: 20px; border-left: 5px solid #3498db; }
+    #search-results { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .search-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .search-item:hover { background: #f0f8ff; }
+
+    /* Botones Grandes */
+    .btn-print-meli { background: #ffe600; color: #2d3277; border: 2px solid #e1c300; font-size: 1.4rem; padding: 20px 50px; font-weight: bold; cursor: pointer; }
+    .btn-print-zebra { background: #2c3e50; color: white; font-size: 1.4rem; padding: 20px 50px; font-weight: bold; cursor: pointer; }
+    .btn-archivar { background: #27ae60; color: white; width: 100%; padding: 15px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
+    
+    /* Panel Logística (Manual) */
+    .logistica-panel { border: 2px solid #3498db; background: #eaf6ff; padding: 20px; border-radius: 10px; margin-top: 20px; }
+    .logistica-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 10px; }
+    .logistica-input { padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; width: 100%; text-align: center; font-weight: bold; }
+    .logistica-label { display: block; font-size: 0.8rem; color: #2c3e50; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+</style>
+
+<div class="container">
+    <input type="hidden" id="orden-id" value="{{ orden.id }}">
+
+    {# --- CABECERA --- #}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h1 style="margin:0; color: #2c3e50;">{{ orden.cliente_nombre }}</h1>
+            <span style="background: #2c3e50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">{{ orden.origen }}</span>
+            {% if orden.etiqueta_url %}
+                <span style="background: #f1c40f; color: #2d3277; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">🏷️ ETIQUETA OK</span>
+            {% endif %}
+        </div>
+        <div>
+            {# Lógica para elegir la clase del badge #}
+            {% set badge_cls = 'st-embalado' %}
+            {% if orden.estado == 'LISTO_DESPACHO' %}{% set badge_cls = 'st-listo' %}
+            {% elif orden.estado == 'COMPLETA' %}{% set badge_cls = 'st-completa' %}
+            {% elif orden.estado == 'PENDIENTE' %}{% set badge_cls = 'st-pendiente' %}
+            {% endif %}
+            
+            <span class="badge-status {{ badge_cls }}">{{ orden.estado }}</span>
+        </div>
+    </div>
+
+    {# --- CONTENIDO --- #}
+    {% if orden.estado in ['PENDIENTE', 'ESPERANDO_ADMIN'] %}
+        <div class="card" style="background: #fff5f5; border-left: 5px solid #c0392b; padding: 30px; text-align: center;">
+            <h3>⛔ Orden Pendiente</h3>
+            {% if orden.estado == 'PENDIENTE' %}
+            <p>Debes generar el Picklist desde el menú principal.</p>
+        {% else %}
+            <p>Orden enviada al administrador para continuar el proceso.</p>
+        {% endif %}
+            <a href="/ordenes/" class="btn btn-secondary">Volver</a>
+        </div>
+    {% else %}
+
+        {# FASE 1: PICKEO #}
+        {% if orden.estado in ['EN_PREPARACION'] %}
+            <div class="card search-container">
+                <h3 style="margin-top:0; color:#3498db;">🔍 Escanear Producto</h3>
+                
+                <input type="text" 
+                       id="search-input" 
+                       name="sku_scan_input_v2" 
+                       autocomplete="off" 
+                       placeholder="Escriba SKU y Enter..." 
+                       autofocus 
+                       oninput="this.value = this.value.toUpperCase()"
+                       style="width: 100%; padding: 15px; font-size: 1.2rem; border: 2px solid #3498db; border-radius: 5px;">
+                
+                <div id="search-results"></div>
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <h3>📦 Items</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+    <tr style="background:#f8f9fa; text-align:left;">
+        <th style="padding:10px;">SKU</th>
+        <th>Desc</th>
+        <th style="text-align:center;">Cant</th>
+        
+        {# Solo mostramos el título de la columna si estamos en preparación #}
+        {% if orden.origen in ['ML','MELI','FULL'] and orden.estado == 'EN_PREPARACION' %}
+            <th style="text-align:center;">Salón</th>
+        {% endif %}
+
+        <th>Acciones</th>
+    </tr>
+</thead>
+
+                <tbody>
+                    {% for item in orden.items %}
+                    {% set completo = item.cantidad_pickeada >= item.cantidad_pedida %}
+                    {% set pct = (item.cantidad_pickeada / item.cantidad_pedida * 100)|int %}
+                    
+                    <tr id="fila-{{ item.sku }}" class="{{ 'row-completa' if completo else '' }}" style="border-bottom: 1px solid #eee;">
+                        <td style="padding:10px; font-weight:bold;">{{ item.sku }}</td>
+                        <td>{{ item.descripcion }}</td>
+                        <td style="text-align:center;">
+                            <span class="picking-qty qty-display {{ 'color-ok' if completo else 'color-pend' }}" 
+                                  data-picked="{{ item.cantidad_pickeada }}" 
+                                  data-ordered="{{ item.cantidad_pedida }}">
+                                {{ item.cantidad_pickeada }} / {{ item.cantidad_pedida }}
+                            </span>
+                            
+                            <div class="progress-wrapper">
+                                <div class="progress-bar {{ 'bar-ok' if completo else 'bar-pend' }}" 
+                                     data-width="{{ pct }}"></div>
+                            </div>
+                        </td>
+                        {% if orden.origen in ['ML','MELI','FULL'] and orden.estado == 'EN_PREPARACION' %}
+<td style="text-align:center;">
+    <input 
+        type="number"
+        min="0"
+        max="{{ item.cantidad_pickeada }}"
+        class="salon-input"
+        data-sku="{{ item.sku }}"
+        data-orden="{{ orden.id }}"
+        placeholder="0"
+        style="width:60px; text-align:center; font-weight:bold; border: 1px solid #3498db;"
+    >
+</td>
+{% endif %}
+                        <td style="text-align:right;">
+                            {% if orden.estado in ['EN_PREPARACION'] and not completo %}
+                                <button onclick="borrarItem('{{ item.sku }}')" style="border:none; background:none; cursor:pointer;">🗑️</button>
+                            {% endif %}
+                            {% if completo %}✅{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# SECCIÓN MANUAL: MULTI-BULTOS #}
+{% if orden.origen == 'MANUAL' and orden.manual_etapa != 'CIERRE' %}
+<div class="logistica-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="margin:0; color:#2980b9;">⚖️ Medidas y Bultos</h3>
+        <button onclick="agregarBultoUI()" class="btn" style="background:#27ae60; color:white; font-size:0.9rem; padding: 5px 15px;">
+            + Agregar Bulto
+        </button>
+    </div>
+    
+    <div id="contenedor-bultos"></div>
+
+    <div style="margin-top: 15px; text-align: right; border-top: 2px solid #aecfea; padding-top: 10px;">
+        <div style="font-size:1.1rem; font-weight:bold; color:#2c3e50; margin-bottom:10px;">
+            Total Peso: <span id="display-total-peso" style="color:#2980b9;">0</span> kg
+        </div>
+        <button onclick="enviarMedidasAdmin()" class="btn" style="background:#2980b9; color:white; font-size:1.1rem; padding:12px 25px; font-weight:bold;">
+            📤 Enviar a Admin
+        </button>
+    </div>
+</div>
+{% endif %}
+
+
+
+        {# FASE 2: IMPRESIÓN (LISTO_DESPACHO) #}
+        {% if orden.estado == 'LISTO_DESPACHO' or (orden.origen == 'MANUAL' and orden.manual_etapa == 'CIERRE') %}
+
+            <div class="card" style="margin-top: 20px; border: 2px solid #e74c3c; background: #fff5f5; text-align: center; padding: 30px;">
+                <h2 style="color: #e74c3c; margin-top:0;">🖨️ Documentación Lista</h2>
+                
+                <div style="margin: 30px 0;">
+                    
+                    {# Obtenemos la lista de bultos desde la 'memoria' JSON #}
+                    {% set paquetes = orden.obtener_paquetes() %}
+                    
+                    {% if paquetes %}
+                        <h4 style="color:#555; margin-bottom:15px;">Selecciona qué etiqueta imprimir:</h4>
+                        
+                        <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
+                            {% for p in paquetes %}
+                                {% if p.etiqueta_url %}
+                                    <button 
+                                data-url="{{ p.etiqueta_url }}" 
+                                data-idx="{{ loop.index }}"
+                                onclick="imprimirEtiquetaBulto(this.dataset.url, this.dataset.idx)" 
+                                class="btn" 
+                                style="background:#2c3e50; color:white; font-size:1.1rem; padding:15px 25px; border:2px solid #34495e; cursor:pointer; box-shadow: 0 4px 0 #1a252f;">
+                                🖨️ Bulto {{ loop.index }} <br> 
+                                <span style="font-size:0.8rem; font-weight:normal; color:#bdc3c7;">({{ p.peso }}kg)</span>
+                            </button>
+                                {% else %}
+                                    <button disabled class="btn" style="background:#bdc3c7; color:#7f8c8d; padding:15px; cursor:not-allowed; border:none;">
+                                        ⛔ Bulto {{ loop.index }} <br> (Sin Etiqueta)
+                                    </button>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                    {% else %}
+                        {% if orden.etiqueta_url %}
+                            <button onclick="imprimirEtiquetaEnvio()" class="btn btn-print-zebra">
+                                🖨️ IMPRIMIR ETIQUETA ÚNICA
+                            </button>
+                        {% else %}
+                            <p style="color:#c0392b; font-weight:bold;">⛔ No hay etiqueta cargada</p>
+                        {% endif %}
+                    {% endif %}
+
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #e74c3c; margin: 20px 0;">
+                
+                <button onclick="confirmarSalida()" class="btn btn-archivar">
+                    📦 CONFIRMAR SALIDA (ARCHIVAR)
+                </button>
+            </div>
+        {% endif %}
+
+        <div style="margin-top: 20px; text-align: right;">
+    {% if orden.estado in ['EN_PREPARACION'] and orden.origen != 'MANUAL' %}
+        <button onclick="finalizarPickeo()" class="btn" style="background: #8e44ad; color: white; font-size: 1.2rem; padding: 15px 30px; font-weight: bold;">
+            ✅ Finalizar Pickeo
+        </button>
+    {% endif %}
+    <a href="/ordenes/" class="btn" style="background: #95a5a6; color: white; margin-left: 10px;">Volver</a>
+</div>
+
+
+    {% endif %}
+</div>
+
+<script>
+    const ordenId = document.getElementById('orden-id').value;
+    const searchInput = document.getElementById('search-input');
+    const resultsDiv = document.getElementById('search-results');
+    let searchTimeout = null;
+
+    // --- INICIALIZACIÓN ---
+    window.addEventListener('load', () => {
+        // --- PERSISTENCIA LOCAL (SALÓN) ---
+    document.querySelectorAll('.salon-input').forEach(input => {
+        // Clave única por orden y producto
+        const key = `salon_${ordenId}_${input.dataset.sku}`;
+        
+        // Recuperar valor si existe
+        const guardado = localStorage.getItem(key);
+        if (guardado) input.value = guardado;
+
+        // Guardar al escribir
+        input.addEventListener('input', function() {
+            localStorage.setItem(key, this.value);
+        });
+    });
+        // 1. Asignar el ancho de las barras de progreso
+        document.querySelectorAll('.progress-bar').forEach(bar => {
+            bar.style.width = bar.getAttribute('data-width') + '%';
+        });
+
+        // 2. ORDENAR TABLA: Poner items con progreso arriba
+        const tbody = document.querySelector('tbody');
+        const filas = Array.from(tbody.querySelectorAll('tr'));
+
+        // Ordenamos: Si tiene items pickeados va antes (-1), si no, va después (1)
+        filas.sort((a, b) => {
+            // Buscamos el elemento que tiene la data
+            const spanA = a.querySelector('.picking-qty');
+            const spanB = b.querySelector('.picking-qty');
+            
+            // Seguridad por si alguna fila no tiene datos (encabezados, etc)
+            if (!spanA || !spanB) return 0;
+
+            const pickedA = parseInt(spanA.dataset.picked || 0);
+            const pickedB = parseInt(spanB.dataset.picked || 0);
+
+            // Si A tiene avance y B no, A va primero.
+            if (pickedA > 0 && pickedB === 0) return -1;
+            if (pickedA === 0 && pickedB > 0) return 1;
+            return 0; // Si ambos tienen o ambos no tienen, mantenemos orden original relativo
+        });
+
+        // Reinsertamos las filas ordenadas
+        filas.forEach(f => tbody.appendChild(f));
+
+        // 3. FOCO AL BUSCADOR
+        if(searchInput) searchInput.focus();
+
+        // 4. RESALTAR EL ÚLTIMO ESCANEADO (Debe ir AL FINAL de todo para quedar primero)
+        const ultimoSku = localStorage.getItem('ultimo_sku_pickeado');
+        if (ultimoSku) {
+            const filaUltima = document.getElementById('fila-' + ultimoSku);
+            if (filaUltima) {
+                // Lo movemos al tope absoluto (empujando a los otros con progreso hacia abajo)
+                tbody.prepend(filaUltima);
+                
+                // Efecto visual
+                filaUltima.style.transition = "background 0.5s";
+                const bgOriginal = filaUltima.style.backgroundColor;
+                filaUltima.style.backgroundColor = "#d4edda"; // Verde claro
+                setTimeout(() => {
+                    filaUltima.style.backgroundColor = bgOriginal; 
+                }, 1500);
+            }
+            localStorage.removeItem('ultimo_sku_pickeado');
+        }
+    });
+
+    // --- FUNCIONES PICKEO ---
+    if(searchInput) {    
+        // MODIFICADO: Usamos 'keydown' para detectar Enter rápido de pistola y prevenir default
+        searchInput.addEventListener("keydown", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault(); // Evita submit y comportamientos raros
+                const sku = this.value.trim();
+                if(sku) {
+                    agregar(sku); 
+                    this.value = ''; // Limpia inmediato para siguiente lectura
+                    this.focus();    // Asegura foco
+                }
+            }
+        });
+    }
+
+    // --- LÓGICA DE AGREGADO Y VINCULACIÓN ---
+
+    function agregar(sku) {
+        fetch('/pickeo/agregar-item-manual', {
+            method:'POST', 
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({orden_id: ordenId, sku: sku})
+        }).then(r=>r.json()).then(d => {
+            if(d.success) {
+                // Éxito normal
+                // CORRECCIÓN: Usamos 'sku_real' que viene del servidor. 
+                // Si por alguna razón no viene, usamos 'sku' (input) como respaldo.
+                localStorage.setItem('ultimo_sku_pickeado', d.sku_real || sku); 
+                location.reload();
+            }
+            // ... (el resto sigue igual)
+            else if (d.error_code === 'UNKNOWN_BARCODE') {
+                // CASO CÓDIGO DESCONOCIDO -> INICIAR VINCULACIÓN
+                manejarVinculacion(d.scanned_code);
+            }
+            else {
+                // Otro error (exceso, etc)
+                alert("⚠️ " + d.error);
+                playErrorSound(); // Si tienes sonido
+            }
+        }).catch(err => alert("Error de red"));
+    }
+
+    function manejarVinculacion(codigoNuevo) {
+        // Reproducir sonido de alerta si es posible
+        // var audio = new Audio('/static/sounds/alert.mp3'); audio.play();
+
+        // Pedir al usuario que escanee el producto correcto
+        let skuTarget = prompt(`⚠️ EL CÓDIGO "${codigoNuevo}" NO ESTÁ REGISTRADO.\n\nPara aprenderlo y vincularlo, escanea (o escribe) ahora el SKU CORRECTO al que pertenece:`);
+
+        if (skuTarget && skuTarget.trim() !== "") {
+            skuTarget = skuTarget.trim().toUpperCase();
+            
+            // Enviamos a vincular
+            fetch('/pickeo/vincular-y-agregar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    orden_id: ordenId,
+                    codigo_nuevo: codigoNuevo,
+                    sku_target: skuTarget
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert("✅ " + data.mensaje);
+                    location.reload();
+                } else {
+                    alert("❌ Error: " + data.error);
+                }
+            });
+        }
+    }
+
+    // Función auxiliar opcional para sonido de error
+    function playErrorSound() {
+        // Puedes agregar un beep aquí si quieres
+    }
+
+    function borrarItem(sku) {
+        if(confirm("¿Borrar item?")) {
+            fetch('/pickeo/borrar-item', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({orden_id: ordenId, sku: sku})
+            }).then(r=>r.json()).then(d => { if(d.success) location.reload(); });
+        }
+    }
+
+    // --- ACCIONES FINALES ---
+    function finalizarPickeo() {
+        // Validar cantidades
+        let ok = true;
+        document.querySelectorAll('.picking-qty').forEach(el => {
+            if(el.dataset.picked != el.dataset.ordered) ok = false;
+        });
+        if(!ok) { alert("⛔ Orden incompleta. Termina de pickear."); return; }
+
+        // Si es manual, validar peso
+        const pesoInput = document.getElementById('pkg-peso');
+        if(pesoInput) {
+            const peso = parseFloat(pesoInput.value);
+            if(!peso || peso <= 0) { alert("⚠️ El peso es obligatorio para ordenes manuales."); return; }
+            
+            // Guardar medidas primero
+            const data = {
+                orden_id: ordenId,
+                peso: peso,
+                largo: parseFloat(document.getElementById('pkg-largo').value)||0,
+                ancho: parseFloat(document.getElementById('pkg-ancho').value)||0,
+                alto: parseFloat(document.getElementById('pkg-alto').value)||0
+            };
+            fetch('/pickeo/guardar-datos-paquete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+        }
+
+        fetch('/pickeo/confirmar-embalado', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({orden_id: ordenId})
+        }).then(r=>r.json()).then(d => {
+            if(d.success) location.reload(); // Recarga para mostrar panel de impresión
+            else alert(d.error);
+        });
+    }
+
+    function imprimirEtiquetaEnvio() {
+    fetch(`/ordenes/imprimir/envio/${ordenId}`)
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                alert("🖨️ Etiqueta enviada al pipeline");
+            } else {
+                alert(d.error || "Error procesando etiqueta");
+            }
+        })
+        .catch(() => alert("Error de red"));
+}
+
+
+    function confirmarSalida() {
+    if (!confirm("¿Confirmar despacho?")) return;
+
+    const salonData = {};
+
+    // Recopilamos datos de la memoria (LocalStorage)
+    // Esto funciona aunque los inputs ya no sean visibles
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        // Filtramos solo las claves de esta orden
+        if (key.startsWith(`salon_${ordenId}_`)) {
+            const sku = key.split('_')[2];
+            const qty = parseInt(localStorage.getItem(key) || 0);
+            if (qty > 0) {
+                salonData[sku] = qty;
+            }
+        }
+    }
+
+    fetch('/pickeo/confirmar-despacho-final', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            orden_id: ordenId,
+            salon: salonData // Enviamos el mapa {'SKU': cantidad}
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            // Limpieza: Borramos la memoria de esta orden para no ensuciar
+            Object.keys(salonData).forEach(sku => {
+                localStorage.removeItem(`salon_${ordenId}_${sku}`);
+            });
+            window.location.href = "/ordenes/";
+        } else {
+            alert(d.error || "Error");
+        }
+    });
+}
+
+    
+    // --- LÓGICA MULTI-BULTO ---
+    
+    // Al cargar, si es manual, ponemos 1 bulto por defecto PERO SIN ROBAR FOCO
+    window.addEventListener('load', () => {
+        // ... (Tu código existente window.load sigue igual) ...
+        const contenedor = document.getElementById('contenedor-bultos');
+        // Si existe el contenedor (estamos en manual) y está vacío, agregamos uno
+        if(contenedor && contenedor.children.length === 0) {
+            agregarBultoUI(false); // <--- CAMBIO: Pasamos false para que NO haga foco
+        }
+    });
+
+    // Modificamos la función para recibir el parámetro opcional
+    function agregarBultoUI(hacerFoco = true) {
+        const contenedor = document.getElementById('contenedor-bultos');
+        const index = contenedor.children.length + 1;
+        
+        const div = document.createElement('div');
+        div.className = 'bulto-row';
+        div.style.cssText = "background:white; padding:10px; border-radius:5px; margin-bottom:10px; border:1px solid #bdc3c7; position:relative;";
+        
+        div.innerHTML = `
+            <div style="font-weight:bold; color:#2980b9; margin-bottom:5px; font-size:0.9rem;">📦 Bulto #${index}</div>
+            <div class="logistica-grid" style="grid-template-columns: repeat(4, 1fr); gap: 5px;">
+                <div><label class="logistica-label">Peso (kg)</label><input type="number" class="inp-peso logistica-input" step="0.1" oninput="calcularTotalPeso()"></div>
+                <div><label class="logistica-label">Largo</label><input type="number" class="inp-largo logistica-input"></div>
+                <div><label class="logistica-label">Ancho</label><input type="number" class="inp-ancho logistica-input"></div>
+                <div><label class="logistica-label">Alto</label><input type="number" class="inp-alto logistica-input"></div>
+            </div>
+            ${index > 1 ? `<button onclick="this.parentElement.remove(); calcularTotalPeso();" style="position:absolute; top:5px; right:5px; background:#e74c3c; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-weight:bold;">&times;</button>` : ''}
+        `;
+        contenedor.appendChild(div);
+        
+        // CAMBIO: Solo hacemos foco si se pide explícitamente (al hacer click en el botón)
+        if (hacerFoco) {
+            div.querySelector('.inp-peso').focus();
+        }
+    }
+
+    function calcularTotalPeso() {
+        let total = 0;
+        document.querySelectorAll('.inp-peso').forEach(inp => {
+            total += parseFloat(inp.value) || 0;
+        });
+        document.getElementById('display-total-peso').innerText = total.toFixed(2);
+    }
+
+    function enviarMedidasAdmin() {
+        if (!confirm("¿Enviar medidas al administrador?")) return;
+        
+        const paquetes = [];
+        let error = false;
+
+        document.querySelectorAll('.bulto-row').forEach((row) => {
+            const peso = parseFloat(row.querySelector('.inp-peso').value);
+            const largo = parseFloat(row.querySelector('.inp-largo').value);
+            const ancho = parseFloat(row.querySelector('.inp-ancho').value);
+            const alto = parseFloat(row.querySelector('.inp-alto').value);
+
+            // Validar solo peso obligatorio
+            if (!peso || peso <= 0) error = true;
+            
+            paquetes.push({
+                peso: peso || 0,
+                largo: largo || 0,
+                ancho: ancho || 0,
+                alto: alto || 0
+            });
+        });
+
+        if (error) { 
+            alert("⚠️ Todos los bultos deben tener al menos el PESO cargado."); 
+            return; 
+        }
+
+        fetch('/pickeo/enviar-medidas-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orden_id: ordenId, paquetes: paquetes })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) { 
+                alert("📨 Medidas enviadas"); 
+                window.location.href = "/ordenes/"; 
+            } 
+            else { alert(d.error || "Error"); }
+        })
+        .catch(() => alert("Error de red"));
+    }
+    
+    // --- IMPRESIÓN INDIVIDUAL DE BULTOS ---
+    function imprimirEtiquetaBulto(url, index) {
+        // Efecto visual de carga
+        const btn = event.target.closest('button');
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = "⏳ Enviando...";
+        btn.disabled = true;
+
+        fetch('/pickeo/imprimir-archivo', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url: url })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                // Restauramos botón pero indicamos éxito
+                btn.innerHTML = `✅ Bulto ${index} Enviado`;
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = textoOriginal;
+                }, 2000);
+            } else {
+                alert("❌ Error: " + d.error);
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        })
+        .catch(() => {
+            alert("Error de red");
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        });
+    }
+</script>
+{% endblock %}

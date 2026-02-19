@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    * { box-sizing: border-box; }
+    .egreso-container { display: grid; grid-template-columns: 40% 60%; gap: 25px; align-items: stretch; }
+    .search-panel, .list-panel { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e1e4e8; display: flex; flex-direction: column; height: 100%; min-height: 500px; }
+    h3 { margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #f1f2f6; color: #c0392b; font-size: 1.3rem; }
+    #search-input { width: 100%; padding: 15px; font-size: 18px; border: 2px solid #e74c3c; border-radius: 6px; margin-bottom: 5px; outline: none; }
+    #search-input:focus { box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.2); }
+    .result-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 1.1rem; }
+    .result-item:hover { background: #fdedec; }
+    .result-sku { font-weight: bold; color: #c0392b; font-family: monospace; margin-right: 10px; }
+    .qty-modal { display: none; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba; margin-bottom: 15px; }
+    .tabla-egreso { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .tabla-egreso th { background: #c0392b; color: white; padding: 12px; text-align: left; }
+    .tabla-egreso td { padding: 12px; border-bottom: 1px solid #eee; }
+    .badge-qty { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 6px; font-weight: bold; display: inline-block; min-width: 30px; text-align: center; }
+    .action-buttons { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+    .btn-dbf { background: #34495e; color: white; }
+    .btn-remito { background: #8e44ad; color: white; }
+    .searchable-dropdown { position: relative; width: 250px; }
+    .searchable-input { width: 100%; padding: 10px; border: 2px solid #7f8c8d; border-radius: 6px; font-size: 1rem; color: #333; }
+    .searchable-list { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 0 0 6px 6px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .searchable-option { padding: 10px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+    .searchable-option:hover { background: #f0f0f0; }
+    .origen-selector { padding: 10px; border: 2px solid #c0392b; border-radius: 6px; font-size: 1rem; font-weight: bold; color: #c0392b; cursor: pointer; }
+    
+    /* MODAL CON BUSCADOR */
+    #modal-vinculacion { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 30px; border-radius: 15px; max-width: 600px; width: 90%; text-align: center; border: 5px solid #c0392b; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+    .code-display { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 900; background: #2c3e50; color: #f1c40f; padding: 10px; display: block; margin: 15px 0; border-radius: 8px; }
+    
+    /* Input del Modal */
+    #link-search-input { width: 100%; padding: 12px; border: 2px solid #c0392b; border-radius: 6px; margin-bottom: 10px; font-size: 1.1rem; }
+    .link-list { text-align: left; max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; }
+    .link-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .link-item:hover { background: #fdedec; }
+
+    @media (max-width: 768px) { .egreso-container { grid-template-columns: 1fr; } }
+</style>
+
+<div class="container">
+    <input type="hidden" id="orden-id" value="{{ orden.id }}">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <div>
+            <h1 style="margin:0; color: #c0392b;">📤 Egreso de Mercadería</h1>
+            <div style="background: #fdedec; color: #c0392b; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-top: 5px; font-weight: bold;">
+                {{ orden.numero_orden }}
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <div>
+                <label style="font-weight: bold; color: #7f8c8d; display:block; font-size:0.8rem;">Cliente:</label>
+                <div class="searchable-dropdown">
+                    <input type="text" id="cliente-display" class="searchable-input" value="-- GENERICO (*) --" placeholder="Buscar..." autocomplete="off">
+                    <input type="hidden" id="cliente" value="*">
+                    <div id="lista-clientes" class="searchable-list">
+                        <div class="searchable-option" onclick="seleccionarCliente('*', '-- GENERICO (*) --')">-- GENERICO (*) --</div>
+                        {% for c in clientes %}
+                            <div class="searchable-option item-cliente" 
+                                 data-nombre="{{ c.nombre|upper }}" 
+                                 data-codigo="{{ c.codigo|upper }}"
+                                 onclick="seleccionarCliente('{{ c.codigo }}', '{{ c.nombre }}')">
+                                <strong>{{ c.codigo }}</strong> - {{ c.nombre }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label for="origen-depo" style="font-weight: bold; color: #c0392b; display:block; font-size:0.8rem;">Sacar de:</label>
+                <select id="origen-depo" class="origen-selector">
+                    <option value="INVP01">🏢 INVP01 (Salón)</option>
+                    <option value="INVP02">📦 INVP02 (Depósito)</option>
+                </select>
+            </div>
+
+            <button onclick="finalizar(false)" class="btn btn-dbf">📄 Confirmar</button>
+            <button onclick="finalizar(true)" class="btn btn-remito">🖨️ + Remito A4</button>
+        </div>
+    </div>
+
+    <div class="egreso-container">
+        <div class="search-panel">
+            <h3>🔍 Buscar para Egresar</h3>
+            <input type="text" id="search-input" placeholder="Escribe nombre o código..." autocomplete="off" autofocus>
+            
+            <div id="scan-msg" style="margin-bottom: 10px; height: 20px; font-weight: bold; font-size: 0.9rem;"></div>
+
+            <div id="qty-area" class="qty-modal">
+                <div style="margin-bottom: 8px; font-weight: bold; color: #856404;">A egresar:</div>
+                <div id="sel-sku" style="margin-bottom: 10px; color: #333;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="manual-qty" value="1" style="width: 100px; padding: 8px; text-align: center;" min="1">
+                    <button onclick="confirmarAgregar()" class="btn btn-success" style="flex-grow: 1; background: #c0392b;">- SACAR</button>
+                    <button onclick="cancelarSeleccion()" class="btn" style="background:#7f8c8d; color: white;">X</button>
+                </div>
+            </div>
+
+            <div id="search-results" style="flex-grow: 1; overflow-y: auto; border-top: 1px solid #eee;">
+                <div style="padding: 20px; text-align: center; color: #bdc3c7;">Escribe para buscar...</div>
+            </div>
+        </div>
+
+        <div class="list-panel">
+            <h3>📋 Lista de Egreso</h3>
+            <div style="flex-grow: 1; overflow-y: auto;">
+                <table class="tabla-egreso">
+                    <thead><tr><th style="text-align: center;">Cant</th><th>Descripción</th><th></th></tr></thead>
+                    <tbody id="tabla-body">
+                        {% for item in orden.items|reverse %}
+                        <tr id="row-{{ item.sku }}">
+                            <td style="text-align: center;"><span class="badge-qty" id="cant-{{ item.sku }}">{{ item.cantidad_pickeada }}</span></td>
+                            <td>
+                                <div style="font-weight: bold; color: #34495e;">{{ item.descripcion }}</div>
+                                <small style="font-family: monospace; color: #7f8c8d;">{{ item.sku }}</small>
+                            </td>
+                            <td><button onclick="borrarItem('{{ item.sku }}')" style="border:none; background:white; cursor:pointer;">🗑️</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-vinculacion" style="display: none;">
+    <div class="modal-content">
+        <h3 style="color: #c0392b; margin-bottom: 10px;">🧠 CÓDIGO NUEVO</h3>
+        <p>Este código no existe en la base de datos:</p>
+        <span id="new-code-display" class="code-display"></span>
+        
+        <p style="font-weight: bold; text-align: left; margin-bottom: 5px;">Busca el producto para vincular:</p>
+        
+        <input type="text" id="link-search-input" placeholder="Escribe nombre del producto..." autocomplete="off">
+        
+        <div id="vinculacion-lista" class="link-list">
+            <div style="padding: 20px; color: #999;">Escribe arriba para buscar...</div>
+        </div>
+        
+        <button onclick="cerrarModal()" class="btn" style="margin-top: 20px; background: #95a5a6; color: white;">Cancelar</button>
+    </div>
+</div>
+
+<script>
+    const clienteDisplay = document.getElementById('cliente-display');
+    const clienteId = document.getElementById('cliente');
+    const listaClientes = document.getElementById('lista-clientes');
+    const opcionesClientes = document.querySelectorAll('.item-cliente');
+
+    clienteDisplay.addEventListener('click', () => {
+        if(clienteDisplay.value === '-- GENERICO (*) --') clienteDisplay.value = '';
+        listaClientes.style.display = 'block';
+    });
+    
+    clienteDisplay.addEventListener('input', function() {
+        const busqueda = this.value.toUpperCase();
+        listaClientes.style.display = 'block';
+        opcionesClientes.forEach(op => {
+            const nombre = op.dataset.nombre;
+            const codigo = op.dataset.codigo;
+            if(nombre.includes(busqueda) || codigo.includes(busqueda)) op.style.display = 'block';
+            else op.style.display = 'none';
+        });
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.searchable-dropdown')) listaClientes.style.display = 'none';
+    });
+    
+    function seleccionarCliente(id, nombre) {
+        clienteId.value = id;
+        clienteDisplay.value = nombre;
+        listaClientes.style.display = 'none';
+    }
+
+    const ordenId = document.getElementById('orden-id').value;
+    const searchInput = document.getElementById('search-input');
+    const resultsDiv = document.getElementById('search-results');
+    const qtyArea = document.getElementById('qty-area');
+    const msgDiv = document.getElementById('scan-msg');
+    
+    // Modal Elements
+    const linkSearchInput = document.getElementById('link-search-input');
+    const linkList = document.getElementById('vinculacion-lista');
+    let codigoPendienteVinculacion = null;
+
+    let itemSeleccionado = null;
+    let timeoutBusqueda = null;
+    let timeoutBusquedaModal = null;
+    let lastKeyTime = Date.now();
+
+    window.onload = () => searchInput.focus();
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const active = document.activeElement;
+            if (active && active.id !== 'search-input' && active.id !== 'manual-qty' && active.id !== 'link-search-input') {
+                e.preventDefault();
+                e.stopPropagation();
+                if(document.getElementById('modal-vinculacion').style.display === 'flex') {
+                    linkSearchInput.focus();
+                } else {
+                    searchInput.focus();
+                }
+                return false;
+            }
+        }
+    });
+
+    // --- SEARCH INPUT PRINCIPAL ---
+    searchInput.addEventListener('input', function(e) {
+        // AQUI ESTABA EL ERROR: QUITAMOS LA LOGICA DE timeDiff
+        clearTimeout(timeoutBusqueda);
+        const query = this.value.trim();
+        
+        qtyArea.style.display = 'none';
+
+        if (query.length < 2) {
+            resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #bdc3c7;">Escribe para buscar...</div>';
+            resultsDiv.style.display = 'block';
+            return;
+        }
+
+        timeoutBusqueda = setTimeout(() => {
+            buscarProductos(query);
+        }, 300);
+    });
+
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const sku = this.value.trim();
+            if(sku) {
+                agregarDirecto(sku);
+                this.value = '';
+                resultsDiv.style.display = 'none';
+                qtyArea.style.display = 'none';
+            }
+        }
+    });
+
+    // --- BUSCADOR DEL MODAL ---
+    linkSearchInput.addEventListener('input', function(e) {
+        const q = this.value.trim();
+        clearTimeout(timeoutBusquedaModal);
+        timeoutBusquedaModal = setTimeout(() => {
+            if(q.length >= 2) buscarParaVincular(q);
+        }, 300);
+    });
+
+    function buscarProductos(q) {
+        resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;">⏳ Buscando...</div>';
+        fetch(`/egresos/buscar?q=${encodeURIComponent(q)}`)
+        .then(r => r.json()).then(data => {
+            resultsDiv.innerHTML = '';
+            if(data.length === 0) return resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;">No encontrado</div>';
+            data.forEach(prod => {
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `<span class="result-sku">${prod.sku}</span> ${prod.descripcion}`;
+                div.onclick = () => seleccionarProducto(prod);
+                resultsDiv.appendChild(div);
+            });
+        });
+    }
+
+    function agregarDirecto(sku) {
+        msgDiv.innerHTML = '<span style="color:#f39c12">⏳ Procesando...</span>';
+        
+        fetch('/egresos/agregar-manual', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ orden_id: ordenId, sku: sku, cantidad: 1 })
+        }).then(r => r.json()).then(d => {
+            if(d.success) {
+                actualizarTabla(d.item);
+                msgDiv.innerHTML = `<span style="color:#27ae60">✅ Agregado: ${d.item.sku}</span>`;
+                setTimeout(() => msgDiv.innerHTML = '', 2000);
+            } else if (d.error_code === 'UNKNOWN_BARCODE') {
+                mostrarModalVinculacion(d.scanned_code);
+            } else {
+                msgDiv.innerHTML = `<span style="color:#c0392b">❌ ${d.error}</span>`;
+            }
+        });
+    }
+
+    // --- LÓGICA DE VINCULACIÓN ---
+    function mostrarModalVinculacion(codigo) {
+        codigoPendienteVinculacion = codigo;
+        document.getElementById('new-code-display').innerText = codigo;
+        document.getElementById('modal-vinculacion').style.display = 'flex';
+        linkSearchInput.value = '';
+        linkList.innerHTML = '<div style="padding:20px; color:#999;">Escribe arriba para buscar el producto...</div>';
+        linkSearchInput.focus();
+    }
+
+    function buscarParaVincular(q) {
+        linkList.innerHTML = '<div style="padding:10px;">⏳ Buscando...</div>';
+        fetch(`/egresos/buscar?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            linkList.innerHTML = '';
+            if(data.length === 0) {
+                linkList.innerHTML = '<div style="padding:10px; color:red;">No encontrado</div>';
+                return;
+            }
+            data.forEach(prod => {
+                const div = document.createElement('div');
+                div.className = 'link-item';
+                div.innerHTML = `<strong>${prod.sku}</strong> - ${prod.descripcion}`;
+                div.onclick = () => vincularCodigo(codigoPendienteVinculacion, prod.sku);
+                linkList.appendChild(div);
+            });
+        });
+    }
+
+    function vincularCodigo(codigo, sku) {
+        if(!confirm(`¿Vincular código ${codigo} al producto ${sku}?`)) return;
+        
+        fetch('/egresos/vincular-y-agregar', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ orden_id: ordenId, codigo_nuevo: codigo, sku_target: sku, cantidad: 1, sku: codigo })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) {
+                alert("🔗 Código aprendido.");
+                location.reload();
+            } else {
+                alert("Error: " + d.error);
+            }
+        });
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-vinculacion').style.display = 'none';
+        searchInput.value = ''; searchInput.focus();
+    }
+
+    function seleccionarProducto(prod) {
+        itemSeleccionado = prod;
+        document.getElementById('sel-sku').innerText = prod.descripcion;
+        qtyArea.style.display = 'block';
+        const input = document.getElementById('manual-qty');
+        input.value = 1; input.focus(); input.select();
+    }
+
+    function cancelarSeleccion() {
+        itemSeleccionado = null; qtyArea.style.display = 'none'; searchInput.focus();
+    }
+
+    function confirmarAgregar() {
+        if(!itemSeleccionado) return;
+        const cantidad = parseInt(document.getElementById('manual-qty').value) || 1;
+        fetch('/egresos/agregar-manual', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ orden_id: ordenId, sku: itemSeleccionado.sku, cantidad: cantidad })
+        }).then(r => r.json()).then(d => {
+            if(d.success) { actualizarTabla(d.item); cancelarSeleccion(); searchInput.value = ''; searchInput.focus(); }
+            else alert(d.error);
+        });
+    }
+
+    document.getElementById('manual-qty').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') confirmarAgregar();
+    });
+
+    function actualizarTabla(item) {
+        const rowId = `row-${item.sku}`;
+        const filaExistente = document.getElementById(rowId);
+        if(filaExistente) {
+            document.getElementById(`cant-${item.sku}`).innerText = item.cantidad;
+            filaExistente.parentNode.prepend(filaExistente);
+            filaExistente.style.backgroundColor = "#fdedec";
+            setTimeout(() => filaExistente.style.backgroundColor = "white", 1000);
+        } else {
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.innerHTML = `
+                <td style="text-align: center;"><span class="badge-qty" id="cant-${item.sku}">${item.cantidad}</span></td>
+                <td><div style="font-weight: bold; color: #34495e;">${item.descripcion}</div><small style="font-family: monospace; color: #7f8c8d;">${item.sku}</small></td>
+                <td><button onclick="borrarItem('${item.sku}')" style="border:none; background:white; cursor:pointer;">🗑️</button></td>`;
+            document.getElementById('tabla-body').prepend(tr);
+        }
+    }
+
+    function borrarItem(sku) {
+        if(!confirm("¿Borrar item?")) return;
+        fetch('/egresos/borrar-item', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({orden_id: ordenId, sku: sku})
+        }).then(r => r.json()).then(d => { if(d.success) document.getElementById(`row-${sku}`).remove(); });
+    }
+
+    function finalizar(imprimirRemito) {
+        const origen = document.getElementById('origen-depo').value;
+        const cliente = document.getElementById('cliente').value;
+        const msg = imprimirRemito ? `¿Confirmar EGRESO desde ${origen} y generar REMITO?` : `¿Confirmar EGRESO desde ${origen}?`;
+        if(!confirm(msg)) return;
+
+        fetch('/egresos/finalizar', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ orden_id: ordenId, imprimir_remito: imprimirRemito, origen: origen, cliente: cliente })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) {
+                if (d.pdf_url) window.open(d.pdf_url, '_blank');
+                alert("✅ Egreso Finalizado.");
+                window.location.href = "/ordenes/";
+            } else alert(d.error);
+        });
+    }
+</script>
+{% endblock %}

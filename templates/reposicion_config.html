@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>⚙️ Configuración de Reglas de Stock</h2>
+    <p class="text-muted">Define cuándo reponer y cuánta cantidad por defecto.</p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="buscador" class="form-control" placeholder="Buscar SKU o Descripción (mínimo 3 letras)...">
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>SKU / Producto</th>
+                    <th class="text-center" style="width: 150px;">Minimo<br><small class="text-muted">(Punto Pedido)</small></th>
+                    <th class="text-center" style="width: 150px;">Reponer<br><small class="text-muted">(Lote)</small></th>
+                    <th class="text-center" style="width: 100px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-resultados">
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                        Escribe en el buscador para configurar productos.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-3">
+        <a href="/reposicion/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver al Tablero
+        </a>
+    </div>
+</div>
+
+<script>
+    const inputBuscador = document.getElementById('buscador');
+    const tablaResultados = document.getElementById('tabla-resultados');
+    let timeout = null;
+
+    inputBuscador.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const q = this.value;
+        if (q.length < 3) return;
+
+        timeout = setTimeout(() => {
+            fetch(`/reposicion/buscar_producto_config?q=${q}`)
+                .then(r => r.json())
+                .then(data => renderTable(data));
+        }, 300);
+    });
+
+    function renderTable(data) {
+        tablaResultados.innerHTML = '';
+        if (data.length === 0) {
+            tablaResultados.innerHTML = '<tr><td colspan="4" class="text-center">No se encontraron productos.</td></tr>';
+            return;
+        }
+
+        data.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <strong>${p.sku}</strong><br>
+                    <span class="text-muted small">${p.descripcion}</span>
+                    ${p.tiene_regla ? '<span class="badge bg-info ms-2">Regla Activa</span>' : ''}
+                </td>
+                <td>
+                    <input type="number" class="form-control text-center input-minimo" 
+                           data-sku="${p.sku}" value="${p.stock_minimo}" min="0">
+                </td>
+                <td>
+                    <input type="number" class="form-control text-center input-cantidad" 
+                           data-sku="${p.sku}" value="${p.cantidad_a_reponer}" min="1">
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-primary btn-sm" onclick="guardar('${p.sku}', this)">
+                        <i class="bi bi-save"></i>
+                    </button>
+                    ${p.tiene_regla ? `
+                    <button class="btn btn-outline-danger btn-sm ms-1" onclick="borrar('${p.sku}')">
+                        <i class="bi bi-trash"></i>
+                    </button>` : ''}
+                </td>
+            `;
+            tablaResultados.appendChild(tr);
+        });
+    }
+
+    window.guardar = function(sku, btn) {
+        const row = btn.closest('tr');
+        const minimo = row.querySelector('.input-minimo').value;
+        const cantidad = row.querySelector('.input-cantidad').value;
+
+        fetch('/reposicion/guardar_regla', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ sku, minimo, cantidad })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if(res.success) {
+                // Feedback visual rápido
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-primary');
+                    // Recargar búsqueda para actualizar badges
+                    inputBuscador.dispatchEvent(new Event('input'));
+                }, 1000);
+            } else {
+                alert('Error: ' + res.mensaje);
+            }
+        });
+    }
+
+    window.borrar = function(sku) {
+        if(!confirm('¿Eliminar regla personalizada para este producto?')) return;
+        fetch(`/reposicion/eliminar_regla/${sku}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) inputBuscador.dispatchEvent(new Event('input'));
+            });
+    }
+</script>
+{% endblock %}

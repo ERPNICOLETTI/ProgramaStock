@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    /* --- LAYOUT DE 3 COLUMNAS --- */
+    .dashboard-wrapper { 
+        display: grid; 
+        grid-template-columns: 260px 1fr 250px; 
+        gap: 30px; 
+        align-items: start; 
+    }
+    .dashboard-sidebar, .dashboard-stats { 
+        background: white; 
+        border-radius: 10px; 
+        padding: 20px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        border: 1px solid #e1e4e8; 
+        position: sticky; 
+        top: 20px; 
+    }
+    .dashboard-stats { 
+        text-align: center; 
+    }
+
+    /* ESTILOS SIDEBAR */
+    .sidebar-section-title { 
+        color: #95a5a6; 
+        font-size: 0.75rem; 
+        font-weight: 800; 
+        text-transform: uppercase; 
+        letter-spacing: 1px; 
+        margin-bottom: 15px; 
+        margin-top: 5px; 
+        text-align: left; 
+    }
+    .sidebar-item { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        padding: 12px 15px; 
+        margin-bottom: 10px; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        font-weight: 600; 
+        text-decoration: none; 
+        transition: transform 0.2s, box-shadow 0.2s; 
+        font-size: 0.95rem; 
+    }
+    .sidebar-item:hover { 
+        transform: translateX(5px); 
+    }
+    .int-all { 
+        background: #f8f9fa; 
+        color: #333; 
+        border: 1px solid #ddd; 
+    }
+
+    /* GRID TARJETAS */
+    .orders-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+        gap: 20px; 
+    }
+    .order-card { 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; 
+        background: white; 
+        border-radius: 10px; 
+        border: 1px solid #e1e4e8; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03); 
+        transition: transform 0.2s, box-shadow 0.2s; 
+        position: relative; 
+        overflow: hidden; 
+    }
+    .order-card:hover { 
+        transform: translateY(-3px); 
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1); 
+        border-color: #3498db; 
+    }
+
+    /* COLORES DE PRIORIDAD (SEMÁFORO) */
+    .border-urgente { border: 2px solid #e74c3c; background: #fff5f5; } /* LISTO PARA SALIR */
+    .border-tn { border: 2px solid #3498db; background: #f0f8ff; }      /* TIENDANUBE (FAST) */
+    .border-manual { border: 2px solid #27ae60; background: #f0fff4; }  /* MANUAL (MEDIR) */
+    .border-meli { border: 2px solid #f1c40f; }                         /* MELI */
+    /* ESTILO REPOSICIÓN */
+    .border-repo { border: 2px solid #fd79a8; background: #fff0f6; }
+    .ribbon-repo { background-color: #e84393; }
+    .bg-repo { background: #fadbd8; color: #c0392b; border: 1px solid #e6b0aa; }
+
+    .ribbon { 
+        position: absolute; 
+        top: 12px; 
+        right: -25px; 
+        transform: rotate(45deg); 
+        color: white; 
+        font-size: 10px; 
+        font-weight: bold; 
+        padding: 5px 30px; 
+        text-transform: uppercase; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+        z-index: 10; 
+    }
+    .ribbon-urgente { background-color: #e74c3c; }
+    .ribbon-tn { background-color: #3498db; }
+    .ribbon-manual { background-color: #27ae60; }
+
+    .card-header { 
+        border-bottom: 1px solid #f0f0f0; 
+        padding: 15px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+    }
+    .order-title { 
+        font-size: 1.2rem; 
+        color: #2c3e50; 
+        margin: 0; 
+        font-weight: 700; 
+        text-align: left; 
+    }
+    .card-body { 
+        padding: 15px; 
+        flex-grow: 1; 
+    }
+    .badge-origin { 
+        font-size: 0.75rem; 
+        padding: 4px 10px; 
+        border-radius: 20px; 
+        font-weight: bold; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px; 
+    }
+    .bg-meli { background: #fff159; color: #2d3277; border: 1px solid #f1c40f; } 
+    .bg-tn { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; } 
+    .bg-manual { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; } 
+    .bg-default { background: #ecf0f1; color: #7f8c8d; }
+    
+    .stats-row { 
+        display: flex; 
+        justify-content: space-between; 
+        color: #7f8c8d; 
+        font-size: 0.9rem; 
+        margin-bottom: 15px; 
+    }
+
+    /* Estilos para Mensajes Flash */
+    .flash-msg {
+        padding: 15px; 
+        border-radius: 5px; 
+        margin-bottom: 10px;
+    }
+    .flash-success {
+        background: #d4edda; 
+        color: #155724; 
+        border: 1px solid #c3e6cb;
+    }
+    .flash-danger {
+        background: #f8d7da; 
+        color: #721c24; 
+        border: 1px solid #f5c6cb;
+    }
+
+    /* PANEL DERECHO */
+    .big-counter { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+    .big-number { font-size: 4rem; font-weight: 900; color: #2c3e50; line-height: 1; }
+    .big-label { font-size: 1rem; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; margin-top: 5px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem; color: #555; }
+    .stat-val { font-weight: bold; color: #333; }
+
+    @media (max-width: 1100px) { 
+        .dashboard-wrapper { grid-template-columns: 220px 1fr; } 
+        .dashboard-stats { display: none; } 
+    }
+    @media (max-width: 768px) { 
+        .dashboard-wrapper { grid-template-columns: 1fr; } 
+        .dashboard-sidebar { position: static; } 
+    }
+</style>
+
+<div class="container">
+    {# --- MENSAJES FLASH --- #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="margin-bottom: 20px;">
+        {% for category, message in messages %}
+          <div class="alert flash-msg flash-{{ category }}">
+              {{ message }}
+          </div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="dashboard-wrapper">
+        
+        <aside class="dashboard-sidebar">
+            <div class="sidebar-section-title">Vista General</div>
+            <a href="javascript:void(0)"
+   onclick="imprimirPicklistSeleccionado()"
+   class="sidebar-item int-all"
+   style="background: #27ae60; color: white; border: none; margin-bottom: 5px;">
+    <span style="font-weight: bold;">📄 Imprimir Picklist</span><span>🖨️</span>
+</a>
+
+            <a href="/ordenes/picklist/historial" class="sidebar-item int-all" style="background: #34495e; color: white; border: none; margin-bottom: 15px;"><span>📚 Historial de Lotes</span></a>
+            <a href="/ordenes/historial" class="sidebar-item int-all" style="background: #2c3e50; color: white;"><span>📜 Historial Completo</span><span>🔎</span></a>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+            <div class="sidebar-section-title">Integraciones</div>
+            <a href="{{ url_for('meli.sincronizar') }}" class="sidebar-item" style="background: #ffe600; color: #2d3277; border: 1px solid #e3cc00; font-weight: bold; margin-bottom: 20px;">
+                <span>🔄 Sincronizar MeLi</span><span>📦</span>
+            </a>
+
+            <div class="sidebar-section-title">Depósito</div>
+            <a href="/reposicion/" class="sidebar-item" style="background: #fd79a8; color: white; border: 1px solid #e84393;">
+                <span>🔄 Reposición Diaria</span><span>🏭</span>
+            </a>
+            
+            <!-- SE HAN REMOVIDO LOS BOTONES DE IMPORTACIÓN DE MAESTROS -->
+        </aside>
+
+        <main class="dashboard-main">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin:0; color: #2c3e50;">Bandeja de Salida</h2>
+                    <p style="margin:5px 0 0 0; color: #7f8c8d; font-size: 0.9rem;">Prioridad: Retornos > TN > Manual > MeLi.</p>
+                </div>
+            </div>
+            
+            {% if not ordenes %}
+                <div class="card" style="text-align: center; padding: 60px; border: 2px dashed #ddd; background: #fafafa;">
+                    <div style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;">✅</div><h3 style="color: #7f8c8d; margin: 0;">¡Todo al día!</h3>
+                </div>
+            {% endif %}
+
+            <div class="orders-grid">
+                {% for orden in ordenes %}
+                
+                {# Lógica de Colores Semáforo #}
+                {% set css_class = 'border-meli' %} 
+                {% set show_ribbon = false %}
+                {% set ribbon_class = '' %}
+                {% set ribbon_text = '' %}
+
+                {% if orden.estado == 'LISTO_DESPACHO' %}
+                    {% set css_class = 'border-urgente' %}
+                    {% set show_ribbon = true %}
+                    {% set ribbon_class = 'ribbon-urgente' %}
+                    {% set ribbon_text = 'LISTO PARA SALIR' %}
+                {# --- BLOQUE NUEVO --- #}
+                {% elif orden.origen == 'REPOSICION' %}
+                    {% set css_class = 'border-repo' %}
+                    {% set show_ribbon = true %}
+                    {% set ribbon_class = 'ribbon-repo' %}
+                    {% set ribbon_text = 'REPOSICIÓN INTERNA' %}
+                {# -------------------- #}    
+                {% elif orden.origen == 'TN' %}
+                    {% set css_class = 'border-tn' %}
+                    {% set show_ribbon = true %}
+                    {% set ribbon_class = 'ribbon-tn' %}
+                    {% set ribbon_text = 'PRIORIDAD 1' %}
+                {% elif orden.origen == 'MANUAL' %}
+                    {% set css_class = 'border-manual' %}
+                    {% set show_ribbon = true %}
+                    {% set ribbon_class = 'ribbon-manual' %}
+                    {% set ribbon_text = 'PRIORIDAD 2' %}
+                {% endif %}
+
+                <div class="card order-card {{ css_class }}" style="position: relative;">
+
+                    <div style="position:absolute; top:10px; left:10px; z-index:20;">
+                     <input type="checkbox"
+                     class="picklist-check"
+                      value="{{ orden.id }}"
+                     style="transform: scale(1.4); cursor:pointer;">
+                     </div>
+
+
+                    {% if show_ribbon %}
+                        <div class="ribbon {{ ribbon_class }}">{{ ribbon_text }}</div>
+                    {% endif %}
+
+                    <div class="card-header">
+                        <div style="flex-grow: 1;">
+                            {% if orden.cliente_nombre %}
+                                <h2 class="order-title" style="font-size: 1.1rem;">{{ orden.cliente_nombre }}</h2>
+                                {% if orden.nro_factura %}<div style="color: #1565c0; font-weight: bold; font-size: 0.9rem;">FC: {{ orden.nro_factura }}</div>
+                                {% else %}<small style="color: #95a5a6;">{{ orden.numero_orden }}</small>{% endif %}
+                            {% else %}<h2 class="order-title">{{ orden.numero_orden }}</h2>{% endif %}
+                        </div>
+                        {% if 'MELI' in orden.origen %} <span class="badge-origin bg-meli">MercadoLibre</span>
+                        {% elif 'REPOSICION' in orden.origen %} <span class="badge-origin bg-repo">Reposición</span>
+                        {% elif 'MANUAL' in orden.origen %} <span class="badge-origin bg-manual">Manual</span>
+                        {% else %} <span class="badge-origin bg-default">{{ orden.origen }}</span>{% endif %}
+                    </div>
+
+                    <div class="card-body">
+                        {# --- OBSERVACIONES / MULTI-BULTO --- #}
+                        {% if orden.observaciones %}
+                            {% if orden.observaciones.startswith('[') %}
+                                <div style="margin-bottom: 10px;">
+                                    <span style="background: #e8f6f3; color: #009688; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; border: 1px solid #b2dfdb; display: inline-block;">
+                                        📦 Multi-Bulto Cargado
+                                    </span>
+                                </div>
+                            {% else %}
+                                <div style="background: #fff3cd; color: #856404; padding: 8px; font-size: 0.85rem; border-radius: 4px; margin-bottom: 10px; border: 1px solid #ffeeba;">
+                                    📝 {{ orden.observaciones }}
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                        <div class="stats-row">
+                            <div><span style="display:block; font-size: 0.75rem; text-transform: uppercase;">Items</span><strong style="font-size: 1.1rem; color: #333;">{{ orden.items|length }}</strong></div>
+                            <div style="text-align: right;"><span style="display:block; font-size: 0.75rem; text-transform: uppercase;">Hora</span><strong style="font-size: 0.95rem; color: #333;">{{ orden.fecha_creacion.strftime('%H:%M') }}</strong></div>
+                        </div>
+
+                        {% if orden.estado == 'LISTO_DESPACHO' %}
+                            <a href="/pickeo/orden/{{ orden.id }}" class="btn" style="background: #e74c3c; color: white; width: 100%; justify-content: space-between;"><span>🖨️ Imprimir y Despachar</span> <span>➡️</span></a>
+                        {% elif orden.estado == 'EN_PREPARACION' %}
+                            <a href="/pickeo/orden/{{ orden.id }}" class="btn" style="background: #f39c12; color: white; width: 100%; justify-content: space-between;"><span>⚡ Continuar Pickeo</span> <span>➡️</span></a>
+                        {% elif orden.estado == 'PENDIENTE' %}
+                            <div style="background: #f0f0f0; color: #999; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; border: 1px solid #ddd;">⏳ Esperando Lote (Picklist)</div>
+                        {% else %}
+                            <a href="/pickeo/orden/{{ orden.id }}" class="btn btn-success" style="width: 100%; justify-content: space-between;"><span>Ver Detalle</span> <span>➡️</span></a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </main>
+
+        <aside class="dashboard-stats">
+            <div class="sidebar-section-title">CONTROL DE SALIDA</div>
+            <div class="big-counter"><div class="big-number">{{ stats.listos }}</div><div class="big-label">📦 PAQUETES LISTOS</div></div>
+            <div class="stat-row"><span>✋ En Preparación</span><span class="stat-val" style="color: #f39c12;">{{ stats.en_prep }}</span></div>
+            <div class="stat-row"><span>⏳ En Admin (Bloqueado)</span><span class="stat-val" style="color: #8e44ad;">{{ stats.esperando_admin }}</span></div>
+            <div class="stat-row"><span>🚚 Despachados Hoy</span><span class="stat-val" style="color: #27ae60;">{{ stats.despachados_hoy }}</span></div>
+            <button onclick="window.print()" class="btn" style="width: 100%; margin-top: 20px; background: #7f8c8d; color: white; font-size: 0.85rem;">📄 Imprimir Manifiesto</button>
+        </aside>
+    </div>
+</div>
+
+<script>
+function imprimirPicklistSeleccionado() {
+    const checks = document.querySelectorAll('.picklist-check:checked');
+    let ids = [];
+
+    checks.forEach(c => ids.push(c.value));
+
+    // SIN SELECCIÓN → comportamiento original
+    if (ids.length === 0) {
+        window.location.href = '/ordenes/picklist';
+        return;
+    }
+
+    // CON SELECCIÓN → pasar IDs por querystring
+    const query = ids.join(',');
+    window.location.href = `/ordenes/picklist?ids=${query}`;
+}
+
+</script>
+
+{% endblock %}

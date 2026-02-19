@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    /* --- TEMAS DE COLOR --- */
+    /* Tema Manual (Verde) */
+    .theme-manual .title-color { color: #27ae60; }
+    .theme-manual .border-color { border-color: #27ae60 !important; }
+    .theme-manual .bg-color { background-color: #27ae60 !important; border-color: #27ae60 !important; }
+    .theme-manual .dashed-border { border: 3px dashed #27ae60; }
+    .theme-manual .btn-outline { color: #27ae60; border: 1px solid #27ae60; background: white; }
+
+    /* Tema TiendaNube (Azul) */
+    .theme-tn .title-color { color: #2980b9; }
+    .theme-tn .border-color { border-color: #2980b9 !important; }
+    .theme-tn .bg-color { background-color: #2980b9 !important; border-color: #2980b9 !important; }
+    .theme-tn .dashed-border { border: 3px dashed #2980b9; }
+
+    /* --- ESTILOS TABLA --- */
+    .batch-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .batch-table th { background: #f8f9fa; padding: 12px; text-align: left; color: #7f8c8d; font-size: 0.85rem; text-transform: uppercase; }
+    .batch-table td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .batch-input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+    
+    .status-ok { color: #27ae60; font-weight: bold; }
+    .status-err { color: #e74c3c; font-weight: bold; }
+    .status-wait { color: #f39c12; font-weight: bold; }
+    
+    /* --- MODAL EDITOR --- */
+    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 25px; border-radius: 8px; width: 600px; max-width: 95%; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+</style>
+
+<script>
+    const TIPO_CARGA = "{{ tipo }}"; 
+</script>
+
+<div class="container" style="max-width: 1200px;">
+    {% set clase_tema = 'theme-tn' if tipo == 'TN' else 'theme-manual' %}
+    
+    <div class="{{ clase_tema }}">
+        
+        <!-- HEADER -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h1 class="title-color" style="margin: 0;">
+                    {% if tipo == 'TN' %} 🛍️ Carga TiendaNube (TXT) {% else %} 📝 Carga Manual (TXT) {% endif %}
+                </h1>
+                <p style="color: #7f8c8d; margin: 5px 0 0 0;">
+                    Arrastra los archivos de impresión (Clipper/Texto) para generar las órdenes.
+                </p>
+            </div>
+            <a href="/ordenes/" class="btn" style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none;">Volver</a>
+        </div>
+
+        <!-- DROP ZONE -->
+        <div class="dashed-border" style="padding: 30px; border-radius: 15px; background: #f0f8ff; text-align: center; cursor: pointer; transition: background 0.2s;" 
+             onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='#f0f8ff'"
+             onclick="document.getElementById('input-files').click()">
+            <div style="font-size: 3rem; margin-bottom: 10px;">📄</div>
+            <h3 style="color: #555; margin: 0;">Arrastra tus archivos de TEXTO aquí</h3>
+            <p style="font-size: 0.85rem; color: #888;">(Archivos .txt, .prn o sin extensión del sistema viejo)</p>
+            <input type="file" id="input-files" style="display: none;" multiple onchange="manejarArchivos(this.files)">
+        </div>
+
+        <!-- BARRA DE ACCIONES -->
+        <div id="actions-bar" style="display: none; margin-top: 20px; justify-content: space-between; align-items: center; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e1e4e8;">
+            <div style="font-weight: bold; color: #555;">
+                Archivos: <span id="count-files">0</span> | Listos: <span id="count-ready" style="color: #27ae60;">0</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="limpiarTodo()" class="btn" style="background: #ecf0f1; color: #7f8c8d; border:none; padding:10px; border-radius:4px; cursor:pointer;">🗑️ Limpiar</button>
+                <button onclick="procesarLote()" class="btn btn-primary bg-color" id="btn-process" style="color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">🚀 CREAR TODAS</button>
+            </div>
+        </div>
+
+        <!-- TABLA PRINCIPAL -->
+        <table class="batch-table" id="tabla-batch" style="display: none;">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Archivo Origen</th>
+                    <th style="width: 25%;">Cliente</th>
+                    <th style="width: 15%;">Factura</th>
+                    {% if tipo == 'TN' %} <th style="width: 20%; color: #2980b9;">🏷️ Etiqueta (PDF/ZPL)</th> {% endif %}
+                    <th style="width: 100px;">Items</th>
+                    <th style="width: 100px;">Estado</th>
+                    <th style="width: 40px;"></th>
+                </tr>
+            </thead>
+            <tbody id="tbody-batch"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL EDITOR DE ITEMS -->
+<div id="modal-editor" class="modal-overlay">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #2c3e50;">📦 Editar Productos</h3>
+            <button onclick="closeModal()" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 15px;" id="modal-subtitle">Orden: ...</p>
+        
+        <!-- Formulario Agregar Item -->
+        <div style="display: flex; gap: 5px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 5px;">
+            <input type="text" id="m-sku" placeholder="SKU" style="flex: 2; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="text" id="m-desc" placeholder="Descripción" style="flex: 3; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="number" id="m-cant" value="1" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="addItemModal()" style="background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 0 15px; font-weight: bold;">+</button>
+        </div>
+
+        <!-- Lista de Items -->
+        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead style="background: #eee; position: sticky; top: 0;">
+                    <tr>
+                        <th style="padding: 8px; text-align: left;">SKU</th>
+                        <th style="padding: 8px; text-align: left;">Descripción</th>
+                        <th style="padding: 8px; text-align: center;">Cant.</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="modal-list-body">
+                    <!-- Filas dinámicas -->
+                </tbody>
+            </table>
+        </div>
+
+        <div style="text-align: right;">
+            <button onclick="closeModal()" style="background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-right: 10px;">Cancelar</button>
+            <button onclick="saveModal()" class="bg-color" style="color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">💾 Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let colaDeOrdenes = [];
+    let currentEditId = null;
+
+    // --- MANEJO DE ARCHIVOS (INPUT) ---
+    function manejarArchivos(files) {
+        if (!files.length) return;
+        document.getElementById('actions-bar').style.display = 'flex';
+        document.getElementById('tabla-batch').style.display = 'table';
+        Array.from(files).forEach(file => {
+            const id = agregarFilaPendiente(file);
+            analizarArchivo(file, id);
+        });
+        document.getElementById('input-files').value = '';
+    }
+
+    function agregarFilaPendiente(file) {
+        const id = colaDeOrdenes.length;
+        // Creamos estructura de datos para la orden
+        colaDeOrdenes.push({ id, file, status: 'pending', data: null });
+        
+        const tbody = document.getElementById('tbody-batch');
+        const tr = document.createElement('tr');
+        tr.id = `row-${id}`;
+        
+        let colExtra = (TIPO_CARGA === 'TN') ? `<td style="background:#f8f9fa;">...</td>` : '';
+        
+        tr.innerHTML = `
+            <td>${id + 1}</td>
+            <td style="font-size:0.85rem; color:#555;">${file.name}</td>
+            <td colspan="2" style="text-align:center; color:#3498db; font-weight:bold;">⏳ Procesando...</td>
+            ${colExtra}
+            <td>...</td>
+            <td class="status-wait">...</td>
+            <td><button onclick="eliminarFila(${id})" style="border:none; background:none; cursor:pointer;">❌</button></td>
+        `;
+        tbody.appendChild(tr);
+        return id;
+    }
+
+    function analizarArchivo(file, id) {
+        const fd = new FormData();
+        fd.append('file', file);
+        
+        // Llamamos al backend para que parsee el texto del archivo
+        fetch('/ordenes/subir-factura-pdf', {method:'POST', body:fd})
+        .then(r=>r.json()).then(res => {
+            const orden = colaDeOrdenes[id];
+            const row = document.getElementById(`row-${id}`);
+            if(!orden || !row) return;
+
+            if(res.success) {
+                orden.status = 'ready';
+                orden.data = res.data; // Guardamos datos parseados
+                renderRow(id);
+            } else {
+                orden.status = 'error';
+                row.innerHTML = `
+                    <td>${id + 1}</td>
+                    <td style="color:#e74c3c;">${file.name}</td>
+                    <td colspan="5" style="color:#e74c3c; font-weight:bold;">⚠️ Error: ${res.error}</td>
+                    <td><button onclick="eliminarFila(${id})">❌</button></td>
+                `;
+            }
+            actualizarContadores();
+        })
+        .catch(err => {
+            console.error(err);
+            const row = document.getElementById(`row-${id}`);
+            if(row) row.innerHTML = `<td colspan="8" style="color:red;">Error de Red</td>`;
+        });
+    }
+
+    function renderRow(id) {
+        const orden = colaDeOrdenes[id];
+        const row = document.getElementById(`row-${id}`);
+        const itemsCount = orden.data.items.length;
+        
+        // Input para etiqueta si es TiendaNube
+        let htmlEtiqueta = '';
+        if (TIPO_CARGA === 'TN') {
+            htmlEtiqueta = `<td><input type="file" id="eti-${id}" class="batch-input" accept=".pdf,.zpl,.png,.jpg" style="font-size:0.8rem;"></td>`;
+        }
+
+        // Botón de items (Rojo si está vacío, Gris si tiene datos)
+        const btnStyle = itemsCount === 0 ? 'background:#e74c3c; color:white;' : 'background:#ecf0f1; color:#333; border:1px solid #ddd;';
+        const itemsText = itemsCount === 0 ? '⚠️ 0 Items' : `📝 ${itemsCount} Prods`;
+
+        row.innerHTML = `
+            <td>${id + 1}</td>
+            <td style="font-size:0.8rem; color:#555;" title="${orden.file.name}">${orden.file.name.substring(0, 15)}...</td>
+            <td><input type="text" class="batch-input" value="${orden.data.cliente}" onchange="updateData(${id},'cliente',this.value)"></td>
+            <td><input type="text" class="batch-input" value="${orden.data.factura}" onchange="updateData(${id},'factura',this.value)"></td>
+            ${htmlEtiqueta}
+            <td style="text-align:center;">
+                <button onclick="openModal(${id})" style="padding:6px 12px; border-radius:20px; font-size:0.8rem; cursor:pointer; font-weight:bold; ${btnStyle}">
+                    ${itemsText}
+                </button>
+            </td>
+            <td class="status-ok">LISTO</td>
+            <td><button onclick="eliminarFila(${id})" style="color:#c0392b; border:none; background:none; cursor:pointer; font-size:1.1rem;">🗑️</button></td>
+        `;
+    }
+
+    // --- LÓGICA DEL MODAL (EDITOR DE ITEMS) ---
+    function openModal(id) {
+        currentEditId = id;
+        const orden = colaDeOrdenes[id];
+        document.getElementById('modal-editor').style.display = 'flex';
+        document.getElementById('modal-subtitle').innerText = `Factura: ${orden.data.factura || '???'} | Archivo: ${orden.file.name}`;
+        renderModalList(orden.data.items);
+    }
+
+    function closeModal() {
+        document.getElementById('modal-editor').style.display = 'none';
+        currentEditId = null;
+    }
+
+    function renderModalList(items) {
+        const tbody = document.getElementById('modal-list-body');
+        tbody.innerHTML = '';
+        if(items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#999;">Sin productos cargados</td></tr>';
+            return;
+        }
+        items.forEach((item, idx) => {
+            tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:8px; font-weight:bold;">${item.sku}</td>
+                    <td style="padding:8px;">${item.descripcion}</td>
+                    <td style="padding:8px; text-align:center;">${item.cantidad}</td>
+                    <td style="text-align:right;">
+                        <button onclick="delItemModal(${idx})" style="color:#e74c3c; border:none; background:none; cursor:pointer; font-weight:bold;">✕</button>
+                    </td>
+                </tr>`;
+        });
+    }
+
+    function addItemModal() {
+        const sku = document.getElementById('m-sku').value.trim();
+        const desc = document.getElementById('m-desc').value.trim();
+        const cant = document.getElementById('m-cant').value;
+        
+        if(sku && desc) {
+            colaDeOrdenes[currentEditId].data.items.push({sku, descripcion:desc, cantidad:cant});
+            renderModalList(colaDeOrdenes[currentEditId].data.items);
+            // Limpiar inputs para carga rápida
+            document.getElementById('m-sku').value = '';
+            document.getElementById('m-desc').value = '';
+            document.getElementById('m-sku').focus();
+        }
+    }
+
+    function delItemModal(idx) {
+        colaDeOrdenes[currentEditId].data.items.splice(idx, 1);
+        renderModalList(colaDeOrdenes[currentEditId].data.items);
+    }
+
+    function saveModal() {
+        // Refrescamos la fila principal para actualizar el contador de items
+        renderRow(currentEditId);
+        closeModal();
+    }
+
+    // --- UTILIDADES ---
+    function updateData(id, field, val) { colaDeOrdenes[id].data[field] = val; }
+    
+    function eliminarFila(id) { 
+        document.getElementById(`row-${id}`).style.display = 'none'; 
+        colaDeOrdenes[id].status = 'deleted'; 
+        actualizarContadores(); 
+    }
+    
+    function limpiarTodo() { 
+        if(!confirm("¿Borrar toda la lista?")) return;
+        colaDeOrdenes=[]; 
+        document.getElementById('tbody-batch').innerHTML=''; 
+        document.getElementById('tabla-batch').style.display='none'; 
+        document.getElementById('actions-bar').style.display='none'; 
+    }
+    
+    function actualizarContadores() {
+        const tot = colaDeOrdenes.filter(o=>o.status!=='deleted').length;
+        const ok = colaDeOrdenes.filter(o=>o.status==='ready').length;
+        document.getElementById('count-files').innerText = tot;
+        document.getElementById('count-ready').innerText = ok;
+        const btn = document.getElementById('btn-process');
+        btn.disabled = ok===0;
+        btn.innerText = ok > 0 ? `🚀 CREAR ${ok} ÓRDENES` : 'ESPERANDO...';
+    }
+
+    // --- PROCESAMIENTO FINAL ---
+    async function procesarLote() {
+        const listos = colaDeOrdenes.filter(o=>o.status==='ready');
+        if(!listos.length) return;
+        if(!confirm(`¿Confirmar la creación de ${listos.length} nuevas órdenes?`)) return;
+
+        const btn = document.getElementById('btn-process');
+        btn.disabled = true; btn.innerText = "⏳ GUARDANDO...";
+        let ok=0, err=0;
+
+        for(const orden of listos) {
+            const row = document.getElementById(`row-${orden.id}`);
+            row.style.opacity = 0.6;
+            
+            try {
+                const fd = new FormData();
+                // Enviamos JSON con datos
+                fd.append('json_data', JSON.stringify({
+                    cliente: orden.data.cliente,
+                    factura: orden.data.factura,
+                    items: orden.data.items,
+                    origen: TIPO_CARGA
+                }));
+                
+                // Si es TN, enviamos la etiqueta también
+                if(TIPO_CARGA==='TN') {
+                    const inp = document.getElementById(`eti-${orden.id}`);
+                    if(inp && inp.files.length) fd.append('etiqueta_file', inp.files[0]);
+                }
+
+                const res = await fetch('/ordenes/crear-completa', {method:'POST', body:fd}).then(r=>r.json());
+                
+                if(res.success) {
+                    ok++; orden.status='done';
+                    row.style.opacity = 1;
+                    row.style.background = '#e8f5e9';
+                    row.innerHTML = `<td colspan="8" style="text-align:center; color:#27ae60; font-weight:bold; padding:15px;">✅ Creada con éxito #${res.orden_id}</td>`;
+                } else {
+                    err++;
+                    row.style.opacity = 1;
+                    // Mostramos el error en la columna de estado (índice 6)
+                    row.cells[row.cells.length-2].innerHTML = `<span style="color:red; font-size:0.8rem;">${res.error}</span>`;
+                }
+            } catch(e) { 
+                err++; 
+                console.error(e); 
+            }
+        }
+        
+        alert(`Proceso Finalizado.\n\n✅ Creadas: ${ok}\n❌ Errores: ${err}`);
+        if(ok>0) {
+            // Redirigir al dashboard para ver las órdenes nuevas
+            window.location.href = "/ordenes/";
+        } else {
+            btn.disabled = false;
+            btn.innerText = "REINTENTAR";
+        }
+    }
+</script>
+{% endblock %}
