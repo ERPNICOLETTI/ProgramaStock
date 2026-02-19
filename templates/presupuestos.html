@@ -361,6 +361,10 @@
 
     let itemIdxEdit = -1;
 
+    function fmtPrice(val) {
+        return val % 1 === 0 ? val.toLocaleString("es-AR") : val.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+    }
+
     document.getElementById("buscador").addEventListener("keyup", e => {
         clearTimeout(t);
         if (e.key === "Enter") buscar();
@@ -385,7 +389,7 @@
                 <div class="row-item">
                     <div class="sku">${p.sku}</div>
                     <div class="desc">${p.descripcion}</div>
-                    <div class="price">$${p.precio_final.toLocaleString("es-AR")}</div>
+                    <div class="price">$ ${fmtPrice(p.precio_final)}</div>
                     <button class="btn-add" onclick="agregarAlCarrito('${prodData}')">AGREGAR</button>
                 </div>`;
                 });
@@ -441,12 +445,14 @@
 
             c.innerHTML += `
             <div class="cart-item">
-                <input type="number" step="0.1" min="0.1" value="${item.cant}" onchange="actualizarCant(${idx}, this.value)">
+                <input type="number" step="1" min="1" value="${item.cant}" onchange="actualizarCant(${idx}, this.value)">
                 <div style="font-weight:600; line-height:1.2;">${item.desc}<br><small style="color:#7f8c8d;">${item.codigo}</small></div>
-                <div style="text-align:right; font-weight:bold;">
-                    $ ${(item.precio + item.ajus).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                    <button style="border:none;background:none;cursor:pointer;font-size:12px;" onclick="abrirAjuste(${idx})" title="Ajustar Precio">✏️</button>
-                    ${item.ajus !== 0 ? `<br><small style="color:${item.ajus > 0 ? '#e74c3c' : '#27ae60'};font-size:10px;">${item.ajus > 0 ? '+' : ''}${item.ajus}</small>` : ''}
+                <div style="text-align:right; font-weight:bold; display:flex; flex-direction:column; align-items:flex-end;">
+                    <div style="display:flex; align-items:center; gap:4px; white-space:nowrap;">
+                        <span>$ ${fmtPrice(item.precio + item.ajus)}</span>
+                        <button style="border:none;background:none;cursor:pointer;font-size:12px;padding:0;" onclick="abrirAjuste(${idx})" title="Ajustar Precio">✏️</button>
+                    </div>
+                    ${item.ajus !== 0 ? `<small style="color:${item.ajus > 0 ? '#e74c3c' : '#27ae60'};font-size:10.5px;">${item.ajus > 0 ? '+' : ''}${fmtPrice(item.ajus)}</small>` : ''}
                 </div>
                 <button style="border:none; background:transparent; color:#e74c3c; cursor:pointer;" onclick="eliminar(${idx})">❌</button>
             </div>
@@ -456,7 +462,7 @@
         const ajusteGlobal = parseFloat(document.getElementById("inpAjusteGlobal").value) || 0;
         const totalFinal = total + ajusteGlobal;
 
-        document.getElementById("cart_total_display").innerText = "$ " + totalFinal.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+        document.getElementById("cart_total_display").innerText = "$ " + fmtPrice(totalFinal);
     }
 
     function generarPDF() {
@@ -515,7 +521,7 @@
         itemIdxEdit = idx;
         const item = carrito[idx];
         document.getElementById("modalAjusteTitle").innerText = "Ajustar: " + item.desc.substring(0, 20) + "...";
-        document.getElementById("lblPrecioBase").innerText = item.precio.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+        document.getElementById("lblPrecioBase").innerText = fmtPrice(item.precio);
 
         document.getElementById("calcMonto").value = item.ajus === 0 ? "" : item.ajus;
         document.getElementById("calcPorc").value = "";

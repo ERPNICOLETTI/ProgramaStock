@@ -95,6 +95,10 @@ def generar_pdf():
         # --- ITEMS ---
         y -= 20
         subtotal = 0.0
+        
+        def fmt(val):
+            return f"{int(val)}" if val == int(val) else f"{val:.2f}"
+
         for item in items:
             codigo = str(item.get('codigo', ''))[:10]
             cant = float(item.get('cant', 1))
@@ -106,12 +110,12 @@ def generar_pdf():
             subtotal += total_item
             
             c.drawString(35, y, f"{codigo:<10}")
-            c.drawString(110, y, f"{cant:.2f}")
+            c.drawString(110, y, fmt(cant))
             c.drawString(150, y, f"{desc:<35}")
-            c.drawRightString(440, y, f"{precio:8.2f}")
+            c.drawRightString(440, y, fmt(precio))
             if ajus != 0:
-                c.drawRightString(495, y, f"{ajus:8.2f}")
-            c.drawRightString(550, y, f"{total_item:8.2f}")
+                c.drawRightString(495, y, fmt(ajus))
+            c.drawRightString(550, y, fmt(total_item))
             
             y -= 15
             if y < 150:
@@ -120,26 +124,31 @@ def generar_pdf():
                 c.setFont("Courier", 10)
         
         # --- FOOTER ---
-        # Fuerza que el footer siempre inicie fijo desde abajo
-        y = 120
+        # Flotante pero cerca del último precio
+        y -= 40
+        if y < 150:
+            c.showPage()
+            y = height - 50
+            c.setFont("Courier", 10)
+            
         c.drawString(110, y, "En caso de abonar con cheques se imputara el pago")
         c.drawString(110, y - 15, "al tipo de cambio de la fecha de acreditacion.///")
         
         c.drawString(420, y, "Subtotal")
-        c.drawRightString(550, y, f"{subtotal:8.2f}")
+        c.drawRightString(550, y, fmt(subtotal))
         
         y -= 25
         ajuste_global = float(data.get('ajuste_global', 0))
         if ajuste_global != 0:
             c.drawString(420, y, "Ajus. Glob")
-            c.drawRightString(550, y, f"{ajuste_global:8.2f}")
+            c.drawRightString(550, y, fmt(ajuste_global))
             y -= 20
             
         total_general = subtotal + ajuste_global
         
         c.drawString(110, y, "Documento no valido como factura")
         c.drawString(420, y, "Total")
-        c.drawRightString(550, y, f"{total_general:8.2f}")
+        c.drawRightString(550, y, fmt(total_general))
         
         c.save()
         
