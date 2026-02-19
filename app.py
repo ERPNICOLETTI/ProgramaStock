@@ -26,7 +26,8 @@ from routes import (
     meli_routes,    # Integración MercadoLibre
     admin,          # Panel Admin Global
     reposicion,      # <--- AGREGAR ESTO
-    stock
+    stock,
+    presupuestos
 )
 
 # --- REGISTRO DE BLUEPRINTS ---
@@ -43,6 +44,7 @@ app.register_blueprint(pickeo.bp)           # /pickeo/
 app.register_blueprint(transferencias.bp)   # /transferencias/
 app.register_blueprint(reposicion.bp)
 app.register_blueprint(stock.bp)
+app.register_blueprint(presupuestos.bp)
 # 3. Stock y Maestros
 app.register_blueprint(ingresos.bp)
 app.register_blueprint(egresos.bp)
