@@ -100,7 +100,8 @@ def generar_pdf():
                 c.setFont("Courier", 10)
         
         # --- FOOTER ---
-        y = max(80, y - 40)
+        # Fuerza que el footer siempre inicie fijo desde abajo
+        y = 120
         c.drawString(110, y, "En caso de abonar con cheques se imputara el pago")
         c.drawString(110, y - 15, "al tipo de cambio de la fecha de acreditacion.///")
         
