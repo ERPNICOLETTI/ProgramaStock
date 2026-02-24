@@ -32,7 +32,8 @@ from routes import (
     admin,          # Panel Admin Global
     reposicion,      # <--- AGREGAR ESTO
     stock,
-    presupuestos
+    presupuestos,
+    cambios
 )
 
 # --- REGISTRO DE BLUEPRINTS ---
@@ -43,6 +44,7 @@ app.register_blueprint(ordenes.bp)          # /ordenes/ (Dashboard)
 app.register_blueprint(picklist.bp)         # /ordenes/picklist
 app.register_blueprint(despacho.bp)         # /ordenes/admin/despacho
 app.register_blueprint(manual.bp)           # /ordenes/manual y /ordenes/manual_tn
+app.register_blueprint(cambios.bp)          # /cambios/ (Gestión de Devoluciones y Cambios)
 
 # 2. Operativa de Depósito
 app.register_blueprint(pickeo.bp)           # /pickeo/

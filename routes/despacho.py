@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify
 from database import db
-from models.orden import Orden
-from models.orden import Item
+from models.orden import Orden, Item, Cambio
+from datetime import datetime
 from datetime import datetime
 
 # Blueprint para administración y despacho
@@ -11,12 +11,16 @@ bp = Blueprint('despacho', __name__, url_prefix='/ordenes')
 def admin_despacho():
     ordenes_para_despacho = Orden.query.filter(
         Orden.estado.in_(['PENDIENTE_DOCS', 'PENDIENTE_ETIQUETA', 'ESPERANDO_ADMIN']),
-        Orden.origen != 'TRANSFERENCIA'
+        Orden.origen.notin_(['TRANSFERENCIA', 'INGRESO', 'EGRESO'])
     ).order_by(Orden.fecha_creacion.asc()).all()
+
+    # Obtener cambios pendientes de ingreso
+    cambios_pendientes = Cambio.query.filter_by(estado_ingreso='PENDIENTE').all()
 
     return render_template(
         'admin_despacho.html',
-        ordenes=ordenes_para_despacho
+        ordenes=ordenes_para_despacho,
+        cambios_pendientes=cambios_pendientes
     )
 
 

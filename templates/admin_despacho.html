@@ -1,29 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; flex-wrap: wrap; gap: 20px;">
+    <div
+        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; flex-wrap: wrap; gap: 20px;">
         <div>
             <h1 style="margin: 0; color: #8e44ad;">🧠 Admin: Control & Despacho</h1>
             <p style="margin: 5px 0 0 0; color: #7f8c8d;">Gestión unificada y liberación de órdenes.</p>
         </div>
-        
+
         <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
-            <a href="/ordenes/manual" class="btn" style="background: #27ae60; color: white;">
-                📝 Cargar Manual
-            </a>
-            <a href="/ordenes/manual_tn" class="btn" style="background: #2980b9; color: white;">
-                🛍️ Cargar TN
-            </a>
+            <button class="btn" style="background: #c0392b; color: white;" onclick="abrirModalCambio()">
+                � NUEVO CAMBIO
+            </button>
             <button class="btn" style="background:#e67e22; color:white;" onclick="abrirModalFull()">
                 📦 Cargar Envío FULL
             </button>
 
             <button class="btn" style="background:#8e44ad; color:white;" onclick="abrirModalCorreccion()">
-            🔍 Escanear / Gestionar
-                </button>
-            
+                🔍 Escanear / Gestionar
+            </button>
+
             <div class="dropdown" style="display: inline-block;">
-                <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" style="background: #34495e; color: white;">
+                <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                    style="background: #34495e; color: white;">
                     💾 Maestros
                 </button>
                 <ul class="dropdown-menu">
@@ -33,144 +32,216 @@
                 </ul>
             </div>
 
-            <a href="{{ url_for('admin.admin_logout') }}" class="btn" style="background: #95a5a6; color: white;">Salir</a>
+            <a href="{{ url_for('admin.admin_logout') }}" class="btn"
+                style="background: #95a5a6; color: white;">Salir</a>
 
         </div>
     </div>
+    {% if cambios_pendientes %}
+    <div class="card" style="margin-bottom: 25px; border: 2px solid #e74c3c; background: #fff5f5; border-radius: 8px;">
+        <h3 style="color: #c0392b; margin: 0 0 15px 0; border-bottom: 1px solid #fadbd8; padding-bottom: 10px;">
+            🚨 CAMBIOS ESPERANDO INGRESO FÍSICO
+        </h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="text-align: left; background: #fadbd8; color: #c0392b;">
+                    <th style="padding: 10px;">Orden Orig.</th>
+                    <th style="padding: 10px;">Devuelve (SKU)</th>
+                    <th style="padding: 10px;">Reemplaza (SKU)</th>
+                    <th style="padding: 10px;">Modalidad</th>
+                    <th style="padding: 10px; text-align: center;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cambio in cambios_pendientes %}
+                <tr style="border-bottom: 1px solid #fadbd8;">
+                    <td style="padding: 10px; font-weight: bold;">{{ cambio.orden_original.numero_orden }}</td>
+                    <td style="padding: 10px;">{{ cambio.items[0].sku_devuelto }} (x{{ cambio.items[0].cantidad_devuelta
+                        }})</td>
+                    <td style="padding: 10px;">{{ cambio.items[0].sku_nuevo }} (x{{ cambio.items[0].cantidad_nueva }})
+                    </td>
+                    <td style="padding: 10px;">
+                        {% if cambio.modalidad == 'ANDREANI' %}
+                        <span
+                            style="background-color: #f1c40f; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">
+                            {{ cambio.modalidad }}
+                        </span>
+                        {% else %}
+                        <span
+                            style="background-color: #34495e; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">
+                            {{ cambio.modalidad }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px; text-align: center;">
+                        <button class="btn btn-success" style="padding: 5px 15px;"
+                            onclick="recibirPaquete('{{ cambio.id }}', '{{ cambio.items[0].sku_devuelto }}')">
+                            📥 Recibir Paquete
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 
     {% if not ordenes %}
-        <div class="card" style="text-align: center; padding: 50px;">
-            <div style="font-size: 3rem;">🎉</div><h3 style="color: #7f8c8d;">Todo al día. No hay bloqueos.</h3>
-        </div>
+    <div class="card" style="text-align: center; padding: 50px;">
+        <div style="font-size: 3rem;">🎉</div>
+        <h3 style="color: #7f8c8d;">Todo al día. No hay bloqueos.</h3>
+    </div>
     {% endif %}
 
     <div style="display: grid; gap: 20px;">
         {% for orden in ordenes %}
-        <div class="card" style="position: relative; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #e1e4e8;">
-            
-            <button onclick="eliminarOrden('{{ orden.id }}', '{{ orden.cliente_nombre }}')" 
-                    style="position: absolute; top: 10px; right: 10px; border: none; background: none; color: #c0392b; font-size: 1.2rem; cursor: pointer; font-weight: bold;"
-                    title="Eliminar Orden Completa">
+        <div class="card"
+            style="position: relative; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #e1e4e8;">
+
+            <button onclick="eliminarOrden('{{ orden.id }}', '{{ orden.cliente_nombre }}')"
+                style="position: absolute; top: 10px; right: 10px; border: none; background: none; color: #c0392b; font-size: 1.2rem; cursor: pointer; font-weight: bold;"
+                title="Eliminar Orden Completa">
                 &times;
             </button>
 
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
-                
+            <div
+                style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
+
                 <div style="flex: 1; min-width: 200px;">
-                    <span style="background: #2c3e50; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{ orden.origen }}</span>
+                    <span
+                        style="background: #2c3e50; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{
+                        orden.origen }}</span>
                     <h3 style="margin: 5px 0 0 0; color: #2c3e50;">{{ orden.cliente_nombre }}</h3>
                     <div style="color: #7f8c8d; font-weight: bold;">{{ orden.numero_orden }}</div>
-                    <div style="font-size: 0.85rem; color: #95a5a6; margin-top: 5px;">Esperando: {{ orden.tiempo_espera|default('Reciente') }}</div>
+                    <div style="font-size: 0.85rem; color: #95a5a6; margin-top: 5px;">Esperando: {{
+                        orden.tiempo_espera|default('Reciente') }}</div>
                 </div>
 
-                <div class="medidas" style="flex: 2; min-width: 350px; border-left: 2px solid #ecf0f1; padding-left: 15px;">
+                <div class="medidas"
+                    style="flex: 2; min-width: 350px; border-left: 2px solid #ecf0f1; padding-left: 15px;">
                     <h4 style="margin-top:0; color:#2980b9;">📦 BULTOS Y ETIQUETAS</h4>
-                    
+
                     {% set lista_paquetes = orden.obtener_paquetes() %}
 
                     {% if lista_paquetes %}
-                        <div id="form-bultos-{{ orden.id }}">
-                            {% for p in lista_paquetes %}
-                            <div style="background:#f9f9f9; padding:8px; border-radius:4px; border:1px solid #ddd; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                                
-                                <div style="font-size:0.85rem;">
-                                    <strong style="color:#2c3e50;">B{{ loop.index }}:</strong> {{ p.peso }}kg 
-                                    <span style="color:#7f8c8d; font-size:0.75rem;">({{ p.largo }}x{{ p.ancho }}x{{ p.alto }})</span>
-                                </div>
+                    <div id="form-bultos-{{ orden.id }}">
+                        {% for p in lista_paquetes %}
+                        <div
+                            style="background:#f9f9f9; padding:8px; border-radius:4px; border:1px solid #ddd; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
 
-                                {% if orden.estado == 'ESPERANDO_ADMIN' %}
-                                    <input type="file" 
-                                           class="input-etiqueta-bulto" 
-                                           data-orden="{{ orden.id }}" 
-                                           data-index="{{ loop.index0 }}" 
-                                           accept="application/pdf"
-                                           style="width: 200px; font-size: 0.8rem;">
-                                {% else %}
-                                    {% if p.etiqueta_url %}
-                                        <a href="{{ p.etiqueta_url }}" target="_blank" style="text-decoration:none; font-size:0.9rem;">✅ Ver PDF</a>
-                                    {% else %}
-                                        <span style="color:#e74c3c; font-size:0.8rem;">Pendiente</span>
-                                    {% endif %}
-                                {% endif %}
+                            <div style="font-size:0.85rem;">
+                                <strong style="color:#2c3e50;">B{{ loop.index }}:</strong> {{ p.peso }}kg
+                                <span style="color:#7f8c8d; font-size:0.75rem;">({{ p.largo }}x{{ p.ancho }}x{{ p.alto
+                                    }})</span>
                             </div>
-                            {% endfor %}
-                        </div>
 
-                        {% if orden.origen == 'MANUAL' and orden.estado == 'ESPERANDO_ADMIN' %}
-                        <div style="text-align:right; margin-top:10px;">
-                            <button class="btn" style="background: #27ae60; color: white;" onclick="guardarEtiquetasDesglosadas('{{ orden.id }}', '{{ lista_paquetes|length }}')">
-                                💾 GUARDAR Y LIBERAR ORDEN
-                            </button>
+                            {% if orden.estado == 'ESPERANDO_ADMIN' %}
+                            <input type="file" class="input-etiqueta-bulto" data-orden="{{ orden.id }}"
+                                data-index="{{ loop.index0 }}" accept="application/pdf"
+                                style="width: 200px; font-size: 0.8rem;">
+                            {% else %}
+                            {% if p.etiqueta_url %}
+                            <a href="{{ p.etiqueta_url }}" target="_blank"
+                                style="text-decoration:none; font-size:0.9rem;">✅ Ver PDF</a>
+                            {% else %}
+                            <span style="color:#e74c3c; font-size:0.8rem;">Pendiente</span>
+                            {% endif %}
+                            {% endif %}
                         </div>
-                        {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    {% if orden.origen == 'MANUAL' and orden.estado == 'ESPERANDO_ADMIN' %}
+                    <div style="text-align:right; margin-top:10px;">
+                        <button class="btn" style="background: #27ae60; color: white;"
+                            onclick="guardarEtiquetasDesglosadas('{{ orden.id }}', '{{ lista_paquetes|length }}')">
+                            💾 GUARDAR Y LIBERAR ORDEN
+                        </button>
+                    </div>
+                    {% endif %}
 
                     {% else %}
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <div>
-                                {% if orden.peso and orden.peso > 0 %}
-                                    <p style="margin:0;"><strong>Peso Total:</strong> {{ orden.peso }} kg</p>
-                                    <p style="margin:5px 0 0 0; font-size:0.85rem; color:#7f8c8d;">Dim: {{ orden.largo }}x{{ orden.ancho }}x{{ orden.alto }}</p>
-                                {% else %}
-                                    <p style="color:#c0392b; font-weight:bold;">⚠️ Medidas no cargadas</p>
-                                {% endif %}
-                            </div>
-
-                            <div style="text-align:right; width: 50%;">
-                                <input type="file" id="file-eti-{{ orden.id }}" accept="application/pdf" multiple style="width: 100%; border: 1px solid #ccc; margin-bottom: 5px; font-size:0.8rem;" placeholder="Seleccionar PDFs...">
-                                
-                                {% if orden.origen == 'MANUAL' and orden.estado == 'ESPERANDO_ADMIN' %}
-                                    <button class="btn" style="background: #27ae60; color: white; width: 100%; font-size:0.85rem;" data-id="{{ orden.id }}" onclick="subirEtiquetaManual(this)">
-                                        🏷️ CARGAR Y DEVOLVER
-                                    </button>
-                                {% else %}
-                                    <button class="btn" style="background: #bdc3c7; color: #2c3e50; width: 100%; cursor: not-allowed; font-size:0.85rem;" disabled>
-                                        ⛔ Esperando operario
-                                    </button>
-                                {% endif %}
-                            </div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            {% if orden.peso and orden.peso > 0 %}
+                            <p style="margin:0;"><strong>Peso Total:</strong> {{ orden.peso }} kg</p>
+                            <p style="margin:5px 0 0 0; font-size:0.85rem; color:#7f8c8d;">Dim: {{ orden.largo }}x{{
+                                orden.ancho }}x{{ orden.alto }}</p>
+                            {% else %}
+                            <p style="color:#c0392b; font-weight:bold;">⚠️ Medidas no cargadas</p>
+                            {% endif %}
                         </div>
+
+                        <div style="text-align:right; width: 50%;">
+                            <input type="file" id="file-eti-{{ orden.id }}" accept="application/pdf" multiple
+                                style="width: 100%; border: 1px solid #ccc; margin-bottom: 5px; font-size:0.8rem;"
+                                placeholder="Seleccionar PDFs...">
+
+                            {% if orden.origen == 'MANUAL' and orden.estado == 'ESPERANDO_ADMIN' %}
+                            <button class="btn"
+                                style="background: #27ae60; color: white; width: 100%; font-size:0.85rem;"
+                                data-id="{{ orden.id }}" onclick="subirEtiquetaManual(this)">
+                                🏷️ CARGAR Y DEVOLVER
+                            </button>
+                            {% else %}
+                            <button class="btn"
+                                style="background: #bdc3c7; color: #2c3e50; width: 100%; cursor: not-allowed; font-size:0.85rem;"
+                                disabled>
+                                ⛔ Esperando operario
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
-            </div> </div> {% endfor %}
+            </div>
+        </div> {% endfor %}
     </div>
 </div>
 
-<div id="modal-full" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
-    <div style="background:white; width:450px; margin:10% auto; padding:25px; border-radius:10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+<div id="modal-full"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
+    <div
+        style="background:white; width:450px; margin:10% auto; padding:25px; border-radius:10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
         <h3 style="color:#27ae60; margin-top:0;">📦 Cargar Envío FULL (Excel/CSV)</h3>
-        
+
         <label style="font-weight:bold; display:block; margin-bottom:5px;">Seleccionar Archivo:</label>
-        <input type="file" id="full-archivo" accept=".csv, .xlsx, .xls" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
-        
+        <input type="file" id="full-archivo" accept=".csv, .xlsx, .xls"
+            style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+
         <p style="font-size:0.8rem; color:#7f8c8d; margin-bottom:15px;">
             El sistema procesará el archivo para dar de baja stock o mover a depósito FULL.
         </p>
 
         <div style="display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn" onclick="cerrarModalFull()" style="background:#95a5a6; color:white;">Cancelar</button>
-            <button class="btn" id="btn-confirmar-full" style="background:#27ae60; color:white;" onclick="confirmarFull()">📤 Procesar Archivo</button>
+            <button class="btn" id="btn-confirmar-full" style="background:#27ae60; color:white;"
+                onclick="confirmarFull()">📤 Procesar Archivo</button>
         </div>
     </div>
 </div>
 
-<div id="modal-correccion" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
-    <div style="background:white; width:600px; margin:5% auto; padding:25px; border-radius:10px; border: 3px solid #8e44ad; max-height: 80vh; overflow-y: auto;">
-        
+<div id="modal-correccion"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
+    <div
+        style="background:white; width:600px; margin:5% auto; padding:25px; border-radius:10px; border: 3px solid #8e44ad; max-height: 80vh; overflow-y: auto;">
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom:15px;">
             <h3 style="color:#8e44ad; margin:0;">🔍 Gestión de Códigos y Vinculaciones</h3>
-            <button onclick="document.getElementById('modal-correccion').style.display='none'" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <button onclick="document.getElementById('modal-correccion').style.display='none'"
+                style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
         </div>
-        
-        <p style="color:#7f8c8d; font-size:0.9rem;">Escaneá un <b>SKU</b>, <b>EAN</b> o un <b>Código de Barras</b> desconocido para ver qué tiene asociado.</p>
-        
+
+        <p style="color:#7f8c8d; font-size:0.9rem;">Escaneá un <b>SKU</b>, <b>EAN</b> o un <b>Código de Barras</b>
+            desconocido para ver qué tiene asociado.</p>
+
         <div style="display:flex; gap:10px; margin-bottom: 20px;">
-            <input type="text" id="input-gestion-codigo" 
-                   style="flex:1; padding:12px; font-size:1.1rem; border:1px solid #ccc; border-radius:4px;" 
-                   placeholder="Escanear aquí..." 
-                   autofocus
-                   onkeypress="if(event.key === 'Enter') buscarVinculaciones()">
-            
-            <button class="btn" style="background:#8e44ad; color:white;" onclick="buscarVinculaciones()">🔍 Buscar</button>
+            <input type="text" id="input-gestion-codigo"
+                style="flex:1; padding:12px; font-size:1.1rem; border:1px solid #ccc; border-radius:4px;"
+                placeholder="Escanear aquí..." autofocus onkeypress="if(event.key === 'Enter') buscarVinculaciones()">
+
+            <button class="btn" style="background:#8e44ad; color:white;" onclick="buscarVinculaciones()">🔍
+                Buscar</button>
         </div>
 
         <div id="contenedor-resultados" style="display:none;">
@@ -183,27 +254,173 @@
                     </tr>
                 </thead>
                 <tbody id="tabla-body-resultados">
-                    </tbody>
+                </tbody>
             </table>
-            
-            <div id="msg-sin-resultados" style="display:none; text-align:center; padding:20px; background:#fff3cd; color:#856404; margin-top:10px; border-radius:5px;">
+
+            <div id="msg-sin-resultados"
+                style="display:none; text-align:center; padding:20px; background:#fff3cd; color:#856404; margin-top:10px; border-radius:5px;">
                 ⚠️ No se encontraron vinculaciones aprendidas para este código.
             </div>
         </div>
     </div>
 </div>
+
+<!-- NUEVO MODAL CAMBIOS -->
+<div id="modal-cambio"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
+    <div
+        style="background:white; width:500px; margin:5% auto; padding:25px; border-radius:10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <h3 style="color:#c0392b; margin-top:0;">🔄 CARGAR NUEVO CAMBIO</h3>
+        <hr>
+
+        <form id="form-nuevo-cambio">
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">ID Orden Original (BD):</label>
+            <input type="number" id="cambio-orden-id" required
+                style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px; margin-bottom: 10px;">Busca el ID numérico
+                interno de la orden que se quiere cambiar.</p>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU que Devuelve:</label>
+                    <input type="text" id="cambio-sku-dev" required
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="width: 80px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
+                    <input type="number" id="cambio-cant-dev" value="1" required min="1"
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU Nuevo a Enviar:</label>
+                    <input type="text" id="cambio-sku-nue"
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div style="width: 80px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
+                    <input type="number" id="cambio-cant-nue" value="1" min="0"
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+            </div>
+
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">Modalidad del Cambio:</label>
+            <select id="cambio-modalidad"
+                style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                <option value="NORMAL">NORMAL (Esperar a que llegue el Roto para mandar el Nuevo)</option>
+                <option value="ANDREANI">ANDREANI (Cross-Shipping: Enviar el Nuevo AHORA Mismo)</option>
+            </select>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn" onclick="cerrarModalCambio()"
+                    style="background:#95a5a6; color:white;">Cancelar</button>
+                <button type="button" class="btn" id="btn-crear-cambio" style="background:#c0392b; color:white;"
+                    onclick="crearNuevoCambio()">Grabar Cambio</button>
+            </div>
+        </form>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // --- FLUJO DE CAMBIOS ---
+    function abrirModalCambio() {
+        document.getElementById('modal-cambio').style.display = 'block';
+        document.getElementById('form-nuevo-cambio').reset();
+    }
+
+    function cerrarModalCambio() {
+        document.getElementById('modal-cambio').style.display = 'none';
+    }
+
+    function crearNuevoCambio() {
+        const payload = {
+            orden_original_id: document.getElementById('cambio-orden-id').value,
+            sku_devuelto: document.getElementById('cambio-sku-dev').value.trim().toUpperCase(),
+            cantidad_devuelta: document.getElementById('cambio-cant-dev').value,
+            sku_nuevo: document.getElementById('cambio-sku-nue').value.trim().toUpperCase(),
+            cantidad_nueva: document.getElementById('cambio-cant-nue').value,
+            modalidad: document.getElementById('cambio-modalidad').value
+        };
+
+        if (!payload.orden_original_id || !payload.sku_devuelto) {
+            alert('El ID de Orden y el SKU a devolver son obligatorios.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-crear-cambio');
+        btn.disabled = true;
+        btn.innerHTML = "⏳ Creando...";
+
+        fetch('/cambios/crear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    Swal.fire('¡Éxito!', 'El cambio se registró correctamente.', 'success').then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', d.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = "Grabar Cambio";
+                }
+            }).catch(e => {
+                Swal.fire('Error', 'Problema de conexión.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = "Grabar Cambio";
+            });
+    }
+
+    function recibirPaquete(cambioId, skuDevuelto) {
+        Swal.fire({
+            title: 'Recibir Paquete',
+            text: `¿Cómo llegó el producto ${skuDevuelto}?`,
+            icon: 'question',
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: '✅ OK (Impecable)',
+            denyButtonText: '❌ FALLADA (Roto)',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                enviarRecibirPaquete(cambioId, 'OK');
+            } else if (result.isDenied) {
+                enviarRecibirPaquete(cambioId, 'DEFECTUOSO');
+            }
+        });
+    }
+
+    function enviarRecibirPaquete(cambioId, condicion) {
+        fetch(`/cambios/recibir/${cambioId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ condicion: condicion })
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    Swal.fire('Cargado', 'El paquete se ingresó al stock y se disparó la acción requerida.', 'success')
+                        .then(() => window.location.reload());
+                } else {
+                    Swal.fire('Error', d.error || 'No se pudo procesar', 'error');
+                }
+            });
+    }
+
     // --- MODAL FULL ---
-    function abrirModalFull() { 
-        document.getElementById('modal-full').style.display = 'block'; 
+    function abrirModalFull() {
+        document.getElementById('modal-full').style.display = 'block';
         document.getElementById('full-archivo').value = ''; // Limpiar input anterior
     }
-    
+
     function cerrarModalFull() { document.getElementById('modal-full').style.display = 'none'; }
-    
+
     function confirmarFull() {
         const fileInput = document.getElementById('full-archivo');
         const btn = document.getElementById('btn-confirmar-full');
@@ -221,28 +438,28 @@
         btn.innerHTML = "⏳ Procesando...";
         btn.disabled = true;
 
-        fetch('/admin/cargar-envio-full', { 
-            method: 'POST', 
-            body: formData 
+        fetch('/admin/cargar-envio-full', {
+            method: 'POST',
+            body: formData
         })
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) {
-                alert("✅ Archivo recibido correctamente.\n" + d.message);
-                cerrarModalFull();
-                // Aquí podríamos recargar la página o mostrar resultados
-            } else {
-                alert("❌ Error: " + d.error);
-            }
-        })
-        .catch(e => {
-            console.error(e);
-            alert("Error de conexión con el servidor.");
-        })
-        .finally(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        });
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert("✅ Archivo recibido correctamente.\n" + d.message);
+                    cerrarModalFull();
+                    // Aquí podríamos recargar la página o mostrar resultados
+                } else {
+                    alert("❌ Error: " + d.error);
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                alert("Error de conexión con el servidor.");
+            })
+            .finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
     }
 
     // --- SUBIR DOCS ---
@@ -250,7 +467,7 @@
         const id = btn.getAttribute('data-id');
         const origen = btn.getAttribute('data-origen');
         const fileEti = document.getElementById(`file-eti-${id}`).files[0];
-        
+
         const formData = new FormData();
         formData.append('orden_id', id);
 
@@ -267,29 +484,29 @@
         btn.innerHTML = "⏳ Subiendo...";
         btn.disabled = true;
 
-        if(!confirm("¿Confirmar carga? La orden volverá al Operador con prioridad.")) {
+        if (!confirm("¿Confirmar carga? La orden volverá al Operador con prioridad.")) {
             btn.innerHTML = originalText;
             btn.disabled = false;
             return;
         }
 
         fetch('/ordenes/admin/subir-docs', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if(d.success) { alert("✅ Documentos cargados. Orden liberada."); window.location.reload(); }
-            else { alert("Error: " + d.error); btn.innerHTML = originalText; btn.disabled = false; }
-        })
-        .catch(e => { alert("Error de conexión"); btn.innerHTML = originalText; btn.disabled = false; });
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) { alert("✅ Documentos cargados. Orden liberada."); window.location.reload(); }
+                else { alert("Error: " + d.error); btn.innerHTML = originalText; btn.disabled = false; }
+            })
+            .catch(e => { alert("Error de conexión"); btn.innerHTML = originalText; btn.disabled = false; });
     }
 
     // --- MAESTROS ---
     async function importarDatos(tipo) {
-        if(!confirm('¿Importar DBF de ' + tipo.toUpperCase() + '?')) return;
+        if (!confirm('¿Importar DBF de ' + tipo.toUpperCase() + '?')) return;
         try {
             const res = await fetch('/ordenes/importar-' + tipo, { method: 'POST' });
             const data = await res.json();
             alert(data.mensaje || (data.success ? '✅ Importación Exitosa' : '❌ Error'));
-        } catch(e) { alert('Error conexión'); }
+        } catch (e) { alert('Error conexión'); }
     }
 
     // --- ETIQUETA MANUAL (MULTI-ARCHIVO) ---
@@ -298,16 +515,16 @@
         const fileInput = document.getElementById(`file-eti-${ordenId}`);
 
         // Verificamos si hay archivos seleccionados
-        if (!fileInput || !fileInput.files.length) { 
-            alert("⚠️ Debes adjuntar al menos una etiqueta PDF."); 
-            return; 
+        if (!fileInput || !fileInput.files.length) {
+            alert("⚠️ Debes adjuntar al menos una etiqueta PDF.");
+            return;
         }
 
         if (!confirm(`¿Adjuntar ${fileInput.files.length} etiqueta(s) y devolver la orden al operario?`)) return;
 
         const formData = new FormData();
         formData.append('orden_id', ordenId);
-        
+
         // RECORREMOS TODOS LOS ARCHIVOS Y LOS AGREGAMOS CON EL MISMO NOMBRE CLAVE 'etiquetas'
         for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('etiquetas', fileInput.files[i]);
@@ -316,38 +533,38 @@
         btn.disabled = true; btn.innerText = "⏳ Uniendo y Subiendo...";
 
         fetch('/admin/subir-etiqueta-manual', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) { 
-                alert("✅ Etiquetas unificadas y cargadas. Orden devuelta."); 
-                window.location.reload(); 
-            }
-            else { 
-                alert(d.error || "Error"); 
-                btn.disabled = false; 
-                btn.innerText = "🏷️ ADJUNTAR ETIQUETA Y DEVOLVER"; 
-            }
-        })
-        .catch(() => { 
-            alert("Error de red"); 
-            btn.disabled = false; 
-            btn.innerText = "🏷️ ADJUNTAR ETIQUETA Y DEVOLVER"; 
-        });
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert("✅ Etiquetas unificadas y cargadas. Orden devuelta.");
+                    window.location.reload();
+                }
+                else {
+                    alert(d.error || "Error");
+                    btn.disabled = false;
+                    btn.innerText = "🏷️ ADJUNTAR ETIQUETA Y DEVOLVER";
+                }
+            })
+            .catch(() => {
+                alert("Error de red");
+                btn.disabled = false;
+                btn.innerText = "🏷️ ADJUNTAR ETIQUETA Y DEVOLVER";
+            });
     }
 
     // --- ELIMINAR ORDEN (FUNCIÓN ARREGLADA) ---
     function eliminarOrden(id, cliente) {
         if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR la orden de ${cliente}?`)) return;
-        
+
         const formData = new FormData();
         formData.append('orden_id', id);
 
         fetch('/admin/eliminar-orden', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) { window.location.reload(); }
-            else { alert("❌ Error: " + data.error); }
-        });
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { window.location.reload(); }
+                else { alert("❌ Error: " + data.error); }
+            });
     }
 
     function desvincularSku(ordenId, sku) {
@@ -358,16 +575,16 @@
         formData.append('sku', sku);
 
         fetch('/ordenes/admin/desvincular-sku', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) { 
-                alert("✅ SKU eliminado correctamente."); 
-                window.location.reload(); 
-            } else { 
-                alert("❌ Error: " + (d.error || "No se pudo borrar")); 
-            }
-        })
-        .catch(e => alert("Error de conexión con el servidor"));
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert("✅ SKU eliminado correctamente.");
+                    window.location.reload();
+                } else {
+                    alert("❌ Error: " + (d.error || "No se pudo borrar"));
+                }
+            })
+            .catch(e => alert("Error de conexión con el servidor"));
     }
 
     // --- NUEVO: GESTIÓN DE CÓDIGOS (SCANNER) ---
@@ -394,26 +611,26 @@
         formData.append('query', query);
 
         fetch('/admin/consultar-asociaciones', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                alert("Error: " + data.error);
-                return;
-            }
-            renderizarResultados(data.resultados);
-            // Volvemos a enfocar el input por si quiere seguir escaneando
-            document.getElementById('input-gestion-codigo').focus();
-        })
-        .catch(e => {
-            console.error(e);
-            alert("Error de conexión con el servidor");
-        });
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+                renderizarResultados(data.resultados);
+                // Volvemos a enfocar el input por si quiere seguir escaneando
+                document.getElementById('input-gestion-codigo').focus();
+            })
+            .catch(e => {
+                console.error(e);
+                alert("Error de conexión con el servidor");
+            });
     }
 
     function renderizarResultados(lista) {
         const tbody = document.getElementById('tabla-body-resultados');
         const msg = document.getElementById('msg-sin-resultados');
-        
+
         tbody.innerHTML = ''; // Limpiar tabla
 
         if (lista.length === 0) {
@@ -446,22 +663,22 @@
     }
 
     function eliminarVinculacion(codigo) {
-        if(!confirm(`⚠️ ¿Seguro que querés que el sistema OLVIDE la asociación del código:\n\n${codigo} ?`)) return;
+        if (!confirm(`⚠️ ¿Seguro que querés que el sistema OLVIDE la asociación del código:\n\n${codigo} ?`)) return;
 
         const formData = new FormData();
         formData.append('codigo_barra', codigo);
 
         fetch('/admin/borrar-asociacion-codigo', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if(d.success) {
-                // Si se borró bien, volvemos a buscar para refrescar la lista
-                buscarVinculaciones(); 
-            } else {
-                alert("❌ Error: " + d.error);
-            }
-        })
-        .catch(e => alert("Error de conexión"));
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    // Si se borró bien, volvemos a buscar para refrescar la lista
+                    buscarVinculaciones();
+                } else {
+                    alert("❌ Error: " + d.error);
+                }
+            })
+            .catch(e => alert("Error de conexión"));
     }
     // --- NUEVO: SUBIDA DESGLOSADA (BULTOS SEPARADOS) ---
     function guardarEtiquetasDesglosadas(ordenId, cantidadBultos) {
@@ -469,7 +686,7 @@
         const inputs = document.querySelectorAll(`.input-etiqueta-bulto[data-orden="${ordenId}"]`);
         const formData = new FormData();
         formData.append('orden_id', ordenId);
-        
+
         let archivosEncontrados = 0;
 
         inputs.forEach(inp => {
@@ -489,23 +706,23 @@
 
         // Advertencia si sube menos etiquetas que bultos
         if (archivosEncontrados < cantidadBultos) {
-            if(!confirm(`⚠️ Solo cargaste ${archivosEncontrados} de ${cantidadBultos} etiquetas.\n¿Enviar así? (Los bultos sin etiqueta no se podrán imprimir en el pickeo)`)) return;
+            if (!confirm(`⚠️ Solo cargaste ${archivosEncontrados} de ${cantidadBultos} etiquetas.\n¿Enviar así? (Los bultos sin etiqueta no se podrán imprimir en el pickeo)`)) return;
         } else {
-            if(!confirm("¿Confirmar carga de etiquetas y devolver orden al operario?")) return;
+            if (!confirm("¿Confirmar carga de etiquetas y devolver orden al operario?")) return;
         }
 
         // Enviamos al backend
         fetch('/admin/subir-etiquetas-desglosadas', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) {
-                alert("✅ Etiquetas guardadas correctamente.");
-                window.location.reload();
-            } else {
-                alert("❌ Error del servidor: " + d.error);
-            }
-        })
-        .catch(e => alert("Error de red o conexión"));
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert("✅ Etiquetas guardadas correctamente.");
+                    window.location.reload();
+                } else {
+                    alert("❌ Error del servidor: " + d.error);
+                }
+            })
+            .catch(e => alert("Error de red o conexión"));
     }
 </script>
 {% endblock %}

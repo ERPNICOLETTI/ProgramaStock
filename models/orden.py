@@ -173,7 +173,37 @@ class MeliToken(db.Model):
     user_id = db.Column(db.String(50)) 
     expires_at = db.Column(db.DateTime)
 
-    # --- PEGAR ESTO AL FINAL DEL ARCHIVO models/orden.py ---
+# --- PEGAR ESTO AL FINAL DEL ARCHIVO models/orden.py ---
+
+class Cambio(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    orden_original_id = db.Column(db.Integer, db.ForeignKey('orden.id'), nullable=False)
+    
+    # 'ANDREANI' (Cross-shipping)
+    # 'NORMAL' (Standard RMA)
+    modalidad = db.Column(db.String(20), default='NORMAL') 
+
+    # Logistics semaphores
+    estado_ingreso = db.Column(db.String(30), default='PENDIENTE') # PENDIENTE -> COMPLETADO
+    estado_egreso = db.Column(db.String(30), default='PENDIENTE')  # PENDIENTE -> EN_PROCESO -> COMPLETADO
+
+    tracking_devolucion = db.Column(db.String(100))
+    fecha_solicitud = db.Column(db.DateTime, default=datetime.now)
+    
+    orden_original = db.relationship('Orden', backref='cambios', lazy=True)
+
+class ItemCambio(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cambio_id = db.Column(db.Integer, db.ForeignKey('cambio.id'), nullable=False)
+    
+    sku_devuelto = db.Column(db.String(50), nullable=False)
+    cantidad_devuelta = db.Column(db.Integer, nullable=False, default=1)
+    condicion_recibida = db.Column(db.String(20), nullable=True) # e.g., 'NUEVO', 'DEFECTUOSO'
+    
+    sku_nuevo = db.Column(db.String(50), nullable=True)
+    cantidad_nueva = db.Column(db.Integer, default=1)
+    
+    cambio = db.relationship('Cambio', backref='items', lazy=True)
 
 # EN models/orden.py (Al final)
 
