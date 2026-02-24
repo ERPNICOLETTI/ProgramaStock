@@ -10,8 +10,11 @@
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
             <button class="btn" style="background: #c0392b; color: white;" onclick="abrirModalCambio()">
-                � NUEVO CAMBIO
+                🔄 NUEVO CAMBIO
             </button>
+            <a href="/ordenes/manual_tn" class="btn" style="background: #2980b9; color: white;">
+                🛍️ Cargar TN
+            </a>
             <button class="btn" style="background:#e67e22; color:white;" onclick="abrirModalFull()">
                 📦 Cargar Envío FULL
             </button>
@@ -274,17 +277,23 @@
         <hr>
 
         <form id="form-nuevo-cambio">
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">ID Orden Original (BD):</label>
-            <input type="number" id="cambio-orden-id" required
-                style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
-            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px; margin-bottom: 10px;">Busca el ID numérico
-                interno de la orden que se quiere cambiar.</p>
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">N° de Factura / N° Orden
+                (A/B-...):</label>
+            <input type="text" id="cambio-nro-factura" required
+                style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"
+                placeholder="Ejemplo: A-0001-00001234 o TN-1234">
+            <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px; margin-bottom: 15px;">Ingresá el comprobante
+                para buscar la orden correcta.</p>
+
+            <datalist id="lista-skus-cambio"></datalist>
 
             <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU que Devuelve:</label>
-                    <input type="text" id="cambio-sku-dev" required
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                    <input type="text" id="cambio-sku-dev" required list="lista-skus-cambio" autocomplete="off"
+                        oninput="buscarSkuParaCambio(this.value)"
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"
+                        placeholder="Escribí para buscar...">
                 </div>
                 <div style="width: 80px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
@@ -296,8 +305,10 @@
             <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU Nuevo a Enviar:</label>
-                    <input type="text" id="cambio-sku-nue"
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                    <input type="text" id="cambio-sku-nue" list="lista-skus-cambio" autocomplete="off"
+                        oninput="buscarSkuParaCambio(this.value)"
+                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"
+                        placeholder="Escribí para buscar...">
                 </div>
                 <div style="width: 80px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
@@ -309,8 +320,8 @@
             <label style="font-weight:bold; display:block; margin-bottom:5px;">Modalidad del Cambio:</label>
             <select id="cambio-modalidad"
                 style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
-                <option value="NORMAL">NORMAL (Esperar a que llegue el Roto para mandar el Nuevo)</option>
-                <option value="ANDREANI">ANDREANI (Cross-Shipping: Enviar el Nuevo AHORA Mismo)</option>
+                <option value="NORMAL">NORMAL</option>
+                <option value="ANDREANI">ANDREANI</option>
             </select>
 
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -335,9 +346,34 @@
         document.getElementById('modal-cambio').style.display = 'none';
     }
 
+    let timeoutBuscadorCambio = null;
+    function buscarSkuParaCambio(q) {
+        if (q.length < 3) return;
+        clearTimeout(timeoutBuscadorCambio);
+        timeoutBuscadorCambio = setTimeout(() => {
+            fetch('/stock/api/buscar?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.resultados) {
+                        const datalist = document.getElementById('lista-skus-cambio');
+                        datalist.innerHTML = '';
+                        data.resultados.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.sku;
+                            opt.text = item.descripcion;
+                            datalist.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(e => console.error("Error buscando SKU:", e));
+        }, 400);
+    }
+
     function crearNuevoCambio() {
+        const nroFacturaInput = document.getElementById('cambio-nro-factura').value.trim();
+
         const payload = {
-            orden_original_id: document.getElementById('cambio-orden-id').value,
+            nro_factura: nroFacturaInput,
             sku_devuelto: document.getElementById('cambio-sku-dev').value.trim().toUpperCase(),
             cantidad_devuelta: document.getElementById('cambio-cant-dev').value,
             sku_nuevo: document.getElementById('cambio-sku-nue').value.trim().toUpperCase(),
@@ -345,8 +381,8 @@
             modalidad: document.getElementById('cambio-modalidad').value
         };
 
-        if (!payload.orden_original_id || !payload.sku_devuelto) {
-            alert('El ID de Orden y el SKU a devolver son obligatorios.');
+        if (!payload.nro_factura || !payload.sku_devuelto) {
+            alert('La Factura/Orden y el SKU a devolver son obligatorios.');
             return;
         }
 

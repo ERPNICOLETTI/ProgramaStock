@@ -153,11 +153,24 @@ def agregar_al_maestro(*args, **kwargs):
 # ==========================================================
 # IMPORTADORES DBF CON ESTADÍSTICAS DETALLADAS
 # ==========================================================
+import time
+
+def _copiar_dbf_red(nombre_archivo):
+    ruta_red = os.path.join(r"\\servidor\sistema\VENTAS", nombre_archivo)
+    ruta_local = os.path.join(Config.DBF_IMPORT_PATH, nombre_archivo)
+    os.makedirs(Config.DBF_IMPORT_PATH, exist_ok=True)
+    for _ in range(3):
+        try:
+            shutil.copy2(ruta_red, ruta_local)
+            return ruta_local
+        except Exception:
+            time.sleep(0.5)
+    return ruta_local if os.path.exists(ruta_local) else None
 
 def importar_catalogo_dbf():
-    ruta = os.path.join(Config.DBF_IMPORT_PATH, "SETART.DBF")
-    if not os.path.exists(ruta):
-        return {"success": False, "error": "Falta SETART.DBF"}
+    ruta = _copiar_dbf_red("SETART.DBF")
+    if not ruta or not os.path.exists(ruta):
+        return {"success": False, "error": "Error de red o falta SETART.DBF en el servidor."}
 
     table = DBF(ruta, encoding="cp850")
     vivos = set()
@@ -234,9 +247,9 @@ def importar_catalogo_dbf():
 
 
 def importar_clientes_dbf():
-    ruta = os.path.join(Config.DBF_IMPORT_PATH, "SETCLI.DBF")
-    if not os.path.exists(ruta):
-        return {"success": False, "error": "Falta SETCLI.DBF"}
+    ruta = _copiar_dbf_red("SETCLI.DBF")
+    if not ruta or not os.path.exists(ruta):
+        return {"success": False, "error": "Error de red o falta SETCLI.DBF en el servidor."}
 
     table = DBF(ruta, encoding="cp850")
     vivos = set()
@@ -283,9 +296,9 @@ def importar_clientes_dbf():
 
 
 def importar_proveedores_dbf():
-    ruta = os.path.join(Config.DBF_IMPORT_PATH, "SETPRO.DBF")
-    if not os.path.exists(ruta):
-        return {"success": False, "error": "Falta SETPRO.DBF"}
+    ruta = _copiar_dbf_red("SETPRO.DBF")
+    if not ruta or not os.path.exists(ruta):
+        return {"success": False, "error": "Error de red o falta SETPRO.DBF en el servidor."}
 
     table = DBF(ruta, encoding="cp850")
     vivos = set()
