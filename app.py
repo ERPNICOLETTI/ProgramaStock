@@ -1,7 +1,8 @@
-from flask import Flask, redirect, send_from_directory, request, jsonify
+from flask import Flask, redirect, send_from_directory, request, jsonify, render_template
 from config import Config
 from database import db
 import os
+import sqlite3
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -59,6 +60,31 @@ app.register_blueprint(admin.bp)
 def index():
     # Redirige siempre al dashboard principal al entrar a la raíz
     return redirect('/ordenes/')
+
+@app.route('/visor-remitos')
+def visor_remitos():
+    movimientos = []
+    # Nos conectamos a la base de datos de Clipper/Movimientos
+    db_path = r'Z:\VENTAS\MOVSTK\stock_movimientos.db'
+    
+    try:
+        # Abrimos la conexión
+        con = sqlite3.connect(db_path)
+        # Queremos que los resultados se comporten como diccionarios (para llamarlos como mov.remito en el HTML)
+        con.row_factory = sqlite3.Row 
+        cur = con.cursor()
+        
+        # Le pedimos todos los registros ordenados desde el más reciente (ID más grande) al más viejo
+        cur.execute("SELECT * FROM stock_movimientos_his ORDER BY id DESC")
+        movimientos = cur.fetchall()
+        
+        con.close()
+    except Exception as e:
+        print(f"Error al leer la base de datos de remitos: {e}")
+        # Si falla (ej: no se encuentra la red Z:), movimientos quedará vacío "[]"
+        
+    # Le pasamos la lista de movimientos al HTML que creamos antes
+    return render_template('visor_remitos.html', movimientos=movimientos)
 
 # Ruta para descargar PDFs y DBFs generados
 @app.route('/descargar-archivo/<filename>')

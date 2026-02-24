@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #2c3e50;">
+            <span style="font-size: 1.5rem; margin-right: 10px;">🔎</span>
+            Visor de Movimientos (Remitos)
+        </h2>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 15px; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px; color: #7f8c8d;">Buscar Remito /
+                    Artículo</label>
+                <input type="text" id="searchInput" placeholder="Escribí el número de remito o código de artículo..."
+                    onkeyup="filtrarTabla()">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px; color: #7f8c8d;">Tipo de
+                    Movimiento</label>
+                <select id="tipoFiltro"
+                    style="padding: 12px; border: 2px solid #dfe6e9; border-radius: 6px; font-size: 16px; width: 100%;"
+                    onchange="filtrarTabla()">
+                    <option value="">TODOS</option>
+                    <option value="INGRESO">INGRESO</option>
+                    <option value="EGRESO">EGRESO</option>
+                    <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="overflow-x: auto; padding: 0;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead style="background: #f8f9fa; border-bottom: 2px solid #e1e4e8;">
+                <tr>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">ID</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Fecha</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Remito</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Cod. Artículo</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Tipo</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Cant.</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Destino / Cliente</th>
+                </tr>
+            </thead>
+            <tbody id="tablaMovimientos">
+                {% for mov in movimientos %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px 15px; color: #7f8c8d;">#{{ mov.id }}</td>
+                    <td style="padding: 12px 15px; font-weight: 500;">{{ mov.fecha }}</td>
+                    <td style="padding: 12px 15px; font-weight: bold; color: #3498db;">{{ mov.remito }}</td>
+                    <td style="padding: 12px 15px; font-weight: bold;">{{ mov.invcod }}</td>
+                    <td style="padding: 12px 15px;">
+                        {% if mov.tipo == 'INGRESO' %}
+                        <span
+                            style="background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">{{
+                            mov.tipo }}</span>
+                        {% elif mov.tipo == 'EGRESO' %}
+                        <span
+                            style="background: #f8d7da; color: #721c24; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">{{
+                            mov.tipo }}</span>
+                        {% else %}
+                        <span
+                            style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">{{
+                            mov.tipo }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 15px; font-size: 1.1rem; font-weight: bold;">{{ mov.cant }}</td>
+                    <td style="padding: 12px 15px; color: #7f8c8d;">
+                        {{ mov.destino if mov.destino else mov.cliente }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="padding: 30px; text-align: center; color: #95a5a6;">
+                        Aún no hay movimientos registrados o cargados
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function filtrarTabla() {
+        const busqueda = document.getElementById('searchInput').value.toLowerCase();
+        const tipo = document.getElementById('tipoFiltro').value.toLowerCase();
+        const filas = document.getElementById('tablaMovimientos').getElementsByTagName('tr');
+
+        for (let i = 0; i < filas.length; i++) {
+            const fila = filas[i];
+            if (fila.cells.length <= 1) continue; // Salta la fila de "Aún no hay movimientos..."
+
+            const remito = fila.cells[2].textContent.toLowerCase();
+            const articulo = fila.cells[3].textContent.toLowerCase();
+            const tipoFila = fila.cells[4].textContent.trim().toLowerCase();
+
+            const coincideBusqueda = remito.includes(busqueda) || articulo.includes(busqueda);
+            const coincideTipo = (tipo === "") || (tipoFila === tipo);
+
+            if (coincideBusqueda && coincideTipo) {
+                fila.style.display = "";
+            } else {
+                fila.style.display = "none";
+            }
+        }
+    }
+</script>
+{% endblock %}
