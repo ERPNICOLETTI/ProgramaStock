@@ -285,35 +285,41 @@
             <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: -10px; margin-bottom: 15px;">Ingresá el comprobante
                 para buscar la orden correcta.</p>
 
-            <datalist id="lista-skus-cambio"></datalist>
-
-            <div style="display:flex; gap:10px;">
-                <div style="flex:1;">
+            <!-- Fila Buscador SKU que devuelve -->
+            <div class="cambio-row" style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:2; position: relative;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU que Devuelve:</label>
-                    <input type="text" id="cambio-sku-dev" required list="lista-skus-cambio" autocomplete="off"
-                        oninput="buscarSkuParaCambio(this.value)"
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"
-                        placeholder="Escribí para buscar...">
+                    <input type="text" id="cambio-sku-dev" placeholder="Escribí para buscar..."
+                        oninput="buscarSku('cambio-sku-dev', 'resultados-sku-dev')"
+                        onfocus="buscarSku('cambio-sku-dev', 'resultados-sku-dev')" autocomplete="off"
+                        style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                    <div id="resultados-sku-dev" class="autocomplete-results"
+                        style="position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: none;">
+                    </div>
                 </div>
                 <div style="width: 80px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
                     <input type="number" id="cambio-cant-dev" value="1" required min="1"
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                        style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                 </div>
             </div>
 
-            <div style="display:flex; gap:10px;">
-                <div style="flex:1;">
+            <!-- Fila Buscador SKU Nuevo (Opcional) -->
+            <div class="cambio-row" style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:2; position: relative;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">SKU Nuevo a Enviar:</label>
-                    <input type="text" id="cambio-sku-nue" list="lista-skus-cambio" autocomplete="off"
-                        oninput="buscarSkuParaCambio(this.value)"
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"
-                        placeholder="Escribí para buscar...">
+                    <input type="text" id="cambio-sku-nue" placeholder="Escribí para buscar..."
+                        oninput="buscarSku('cambio-sku-nue', 'resultados-sku-nue')"
+                        onfocus="buscarSku('cambio-sku-nue', 'resultados-sku-nue')" autocomplete="off"
+                        style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                    <div id="resultados-sku-nue" class="autocomplete-results"
+                        style="position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: none;">
+                    </div>
                 </div>
                 <div style="width: 80px;">
                     <label style="font-weight:bold; display:block; margin-bottom:5px;">Cant:</label>
-                    <input type="number" id="cambio-cant-nue" value="1" min="0"
-                        style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;">
+                    <input type="number" id="cambio-cant-nue" value="1" min="1"
+                        style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                 </div>
             </div>
 
@@ -346,28 +352,48 @@
         document.getElementById('modal-cambio').style.display = 'none';
     }
 
-    let timeoutBuscadorCambio = null;
-    function buscarSkuParaCambio(q) {
-        if (q.length < 3) return;
+    function buscarSku(inputId, resultsId) {
+        const input = document.getElementById(inputId);
+        const resultsDiv = document.getElementById(resultsId);
+        const q = input.value.trim();
+
+        if (q.length < 2) {
+            resultsDiv.style.display = 'none';
+            return;
+        }
+
         clearTimeout(timeoutBuscadorCambio);
         timeoutBuscadorCambio = setTimeout(() => {
-            fetch('/stock/api/buscar?q=' + encodeURIComponent(q))
+            fetch(`/ingresos/buscar?q=${encodeURIComponent(q)}`)
                 .then(r => r.json())
                 .then(data => {
-                    if (data.success && data.resultados) {
-                        const datalist = document.getElementById('lista-skus-cambio');
-                        datalist.innerHTML = '';
-                        data.resultados.forEach(item => {
-                            const opt = document.createElement('option');
-                            opt.value = item.sku;
-                            opt.text = item.descripcion;
-                            datalist.appendChild(opt);
+                    resultsDiv.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'autocomplete-item';
+                            div.innerHTML = `<span class="autocomplete-sku">${item.sku}</span> <span class="autocomplete-desc">${item.descripcion}</span>`;
+                            div.onclick = () => {
+                                input.value = item.sku;
+                                resultsDiv.style.display = 'none';
+                            };
+                            resultsDiv.appendChild(div);
                         });
+                        resultsDiv.style.display = 'block';
+                    } else {
+                        resultsDiv.style.display = 'none';
                     }
                 })
-                .catch(e => console.error("Error buscando SKU:", e));
-        }, 400);
+                .catch(e => console.error("Error buscando:", e));
+        }, 300);
     }
+
+    // Cerrar autocomplete si se hace click afuera
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.cambio-row')) {
+            document.querySelectorAll('.autocomplete-results').forEach(el => el.style.display = 'none');
+        }
+    });
 
     function crearNuevoCambio() {
         const nroFacturaInput = document.getElementById('cambio-nro-factura').value.trim();
@@ -416,27 +442,45 @@
     function recibirPaquete(cambioId, skuDevuelto) {
         Swal.fire({
             title: 'Recibir Paquete',
-            text: `¿Cómo llegó el producto ${skuDevuelto}?`,
+            html: `¿Cómo llegó el producto <b>${skuDevuelto}</b>?<br><br>
+                   <select id="swal-ubicacion" class="swal2-select" style="display:flex; margin:0 auto; width:80%;">
+                        <option value="DEPO">Mandar a DEPÓSITO</option>
+                        <option value="SALON">Mandar a SALÓN</option>
+                   </select>`,
             icon: 'question',
             showDenyButton: true,
             showCancelButton: true,
             confirmButtonText: '✅ OK (Impecable)',
             denyButtonText: '❌ FALLADA (Roto)',
-            cancelButtonText: 'Cancelar'
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                return {
+                    condicion: 'OK',
+                    ubicacion: document.getElementById('swal-ubicacion').value
+                }
+            },
+            preDeny: () => {
+                return {
+                    condicion: 'DEFECTUOSO',
+                    ubicacion: document.getElementById('swal-ubicacion').value // Aunque esté fallada mandamos el dato, pero no sumará stock igual
+                }
+            }
         }).then((result) => {
             if (result.isConfirmed) {
-                enviarRecibirPaquete(cambioId, 'OK');
+                enviarRecibirPaquete(cambioId, result.value.condicion, result.value.ubicacion);
             } else if (result.isDenied) {
-                enviarRecibirPaquete(cambioId, 'DEFECTUOSO');
+                // result.value is null for deny, we must construct it here or pass default
+                const ubicacionDefault = document.getElementById('swal-ubicacion') ? document.getElementById('swal-ubicacion').value : 'DEPO';
+                enviarRecibirPaquete(cambioId, 'DEFECTUOSO', ubicacionDefault);
             }
         });
     }
 
-    function enviarRecibirPaquete(cambioId, condicion) {
+    function enviarRecibirPaquete(cambioId, condicion, ubicacion) {
         fetch(`/cambios/recibir/${cambioId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ condicion: condicion })
+            body: JSON.stringify({ condicion: condicion, ubicacion: ubicacion })
         })
             .then(r => r.json())
             .then(d => {

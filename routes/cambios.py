@@ -40,11 +40,19 @@ def generar_orden_cambio(cambio, item_cambio):
         nuevo_item = Item(
             orden_id=nueva_orden.id,
             sku=item_cambio.sku_nuevo,
-            descripcion=item_cambio.sku_nuevo, # Se puede mejorar buscando en ProductoMaestro
+            descripcion="REEMPLAZO POR CAMBIO", 
             cantidad_pedida=item_cambio.cantidad_nueva
         )
-        db.session.add(nuevo_item)
+    else:
+        # Item ficticio para trabar la orden y dejarla pendiente visualmente
+        nuevo_item = Item(
+            orden_id=nueva_orden.id,
+            sku="PENDIENTE",
+            descripcion="FALTA DEFINIR REEMPLAZO (" + item_cambio.sku_devuelto + ")",
+            cantidad_pedida=1
+        )
         
+    db.session.add(nuevo_item)
     return nueva_orden
 
 @bp.route('/crear', methods=['POST'])
@@ -68,7 +76,18 @@ def crear_cambio():
         ).first()
         
         if not orden:
-            return jsonify({'success': False, 'error': f'Orden original "{factura_u_orden}" no encontrada'})
+            # En vez de bloquear, creamos una orden "ancla" fantasma para poder seguir
+            orden = Orden(
+                numero_orden=f"REF-{factura_u_orden}"[:20],
+                origen="MANUAL",
+                cliente_nombre="CAMBIO EXTERNO / MANUAL",
+                nro_factura=factura_u_orden,
+                estado="ENTREGADO",
+                tipo_flujo="MANUAL",
+                manual_etapa="ENTREGADO"
+            )
+            db.session.add(orden)
+            db.session.flush()
             
         nuevo_cambio = Cambio(
             orden_original_id=orden.id,
@@ -109,6 +128,7 @@ def recibir_cambio(cambio_id):
     try:
         data = request.get_json()
         condicion = data.get('condicion', 'OK')
+        ubicacion = data.get('ubicacion', 'DEPO')  # Recibimos DEPO/SALON desde el front
         
         cambio = Cambio.query.get(cambio_id)
         if not cambio:
@@ -122,11 +142,26 @@ def recibir_cambio(cambio_id):
         
         # Generar Movimiento para sumar el stock devuelto
         if condicion == 'OK': # Solo sumamos si no está roto
+            # 1. Creamos Orden Dummy de INGRESO para que el sincronizador lo arrastre
+            orden_dummy = Orden(
+                numero_orden=f"DEV-{cambio.orden_original.numero_orden}"[:20],
+                origen="INGRESO",
+                destino="DEVOLUCION", 
+                cliente_nombre="CAMBIO EXTERNO / MANUAL",
+                nro_factura=cambio.orden_original.numero_orden,
+                estado="ENTREGADO",
+                tipo_flujo="MANUAL",
+                manual_etapa="ENTREGADO"
+            )
+            db.session.add(orden_dummy)
+            db.session.flush()
+
+            # 2. Creamos Movimiento atado a esa Orden Dummy y con el Origen que eligió el user
             mov_ingreso = Movimiento(
-                orden_id=cambio.orden_original_id,
+                orden_id=orden_dummy.id,
                 sku=item.sku_devuelto,
-                cantidad=item.cantidad_devuelta, # Positivo, ingresa
-                origen_stock='DEPO' 
+                cantidad=item.cantidad_devuelta, 
+                origen_stock=ubicacion 
             )
             db.session.add(mov_ingreso)
             
