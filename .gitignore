@@ -23,3 +23,8 @@ orden_actual.txt
 # Carpetas macOS o Windows genéricas
 .DS_Store
 Thumbs.db
+
+# Archivos generados
+*.zip
+static/etiquetas/*.pdf
+static/presupuestos/*.pdf
