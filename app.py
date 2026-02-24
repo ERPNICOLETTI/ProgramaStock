@@ -133,6 +133,30 @@ def visor_remitos():
             mov = dict(row) # Convertimos a dict mutable
             codigo = str(mov.get('invcod', '')).strip().upper()
             mov['nombre'] = nombres_dict.get(codigo, "")
+
+            # Determinamos si fue a Salón (invact) o Depósito (invpen)
+            try:
+                invpen = float(mov.get('invpen', 0) or 0)
+                invact = float(mov.get('invact', 0) or 0)
+                tipo_mov = str(mov.get('tipo', '')).strip().upper()
+
+                if tipo_mov == 'TRANSFERENCIA':
+                    if invpen < 0 and invact > 0:
+                        mov['ubicacion'] = 'DEPO → SALÓN'
+                    elif invact < 0 and invpen > 0:
+                        mov['ubicacion'] = 'SALÓN → DEPO'
+                    else:
+                        mov['ubicacion'] = ''
+                else:
+                    # EGRESO o INGRESO
+                    if invpen != 0 and invact == 0:
+                        mov['ubicacion'] = 'DEPO'
+                    elif invact != 0 and invpen == 0:
+                        mov['ubicacion'] = 'SALÓN'
+                    else:
+                        mov['ubicacion'] = ''
+            except:
+                mov['ubicacion'] = ''
             
             # Acortar fecha (ej: "2026-02-23 17:16:03" a "23/02 17:16")
             fecha_str = mov.get('fecha', '')

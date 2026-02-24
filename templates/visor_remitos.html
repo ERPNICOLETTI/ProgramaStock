@@ -70,7 +70,13 @@
                             mov.tipo }}</span>
                         {% endif %}
                     </td>
-                    <td style="padding: 12px 15px; font-size: 1.1rem; font-weight: bold;">{{ mov.cant }}</td>
+                    <td style="padding: 12px 15px; font-size: 1.1rem; font-weight: bold;">
+                        {{ mov.cant }}
+                        {% if mov.ubicacion %}
+                        <div style="font-size: 0.75rem; color: #7f8c8d; font-weight: normal;">({{ mov.ubicacion }})
+                        </div>
+                        {% endif %}
+                    </td>
                     <td style="padding: 12px 15px; color: #7f8c8d;">
                         {{ mov.destino if mov.destino else mov.cliente }}
                     </td>
