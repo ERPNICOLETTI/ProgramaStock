@@ -169,8 +169,15 @@ def recibir_cambio(cambio_id):
         
         # LOGICA NORMAL: Recién ahora que recibimos el roto, mandamos el nuevo
         if cambio.modalidad == 'NORMAL' and cambio.estado_egreso == 'PENDIENTE':
-            generar_orden_cambio(cambio, item)
-            cambio.estado_egreso = 'EN_PROCESO'
+            if item.sku_nuevo and item.cantidad_nueva > 0:
+                # Sí hay producto nuevo a enviar, disparamos orden
+                generar_orden_cambio(cambio, item)
+                cambio.estado_egreso = 'EN_PROCESO'
+            else:
+                # No se registró SKU nuevo
+                # LO DEJAMOS PENDIENTE DE DEFINIR REEMPLAZO EN LA PANTALLA DE CAMBIOS
+                pass
+            
             
         db.session.commit()
         return jsonify({'success': True, 'mensaje': 'Paquete recibido y stock actualizado'})

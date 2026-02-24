@@ -424,6 +424,7 @@
             .then(r => r.json())
             .then(d => {
                 if (d.success) {
+                    cerrarModalCambio();
                     Swal.fire('¡Éxito!', 'El cambio se registró correctamente.', 'success').then(() => {
                         window.location.reload();
                     });
