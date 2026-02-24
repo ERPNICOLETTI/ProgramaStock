@@ -3,6 +3,10 @@ from config import Config
 from database import db
 import os
 import sqlite3
+import shutil
+import time
+import dbf
+from datetime import datetime
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -54,6 +58,50 @@ app.register_blueprint(egresos.bp)
 app.register_blueprint(meli_routes.meli_bp, url_prefix='/meli')
 app.register_blueprint(admin.bp)
 
+# --- FUNCIONES DE SOPORTE ---
+_SETART_CACHE = None
+
+def _get_nombres_dict():
+    """Trae nombres de DBF similar a ORCHESTRATOR.PY, usando copia viva como consulta_live.py"""
+    global _SETART_CACHE
+    if _SETART_CACHE is not None:
+        return _SETART_CACHE
+        
+    _SETART_CACHE = {}
+    ruta_original = r"\\servidor\sistema\VENTAS\SETART.DBF"
+    ruta_temp = rf"C:\Users\Usuario\Desktop\ERP-PINO\temp_visor_{int(time.time() * 1000)}.dbf"
+    
+    try:
+        # 1. Copia segura como en consulta_live.py
+        shutil.copy2(ruta_original, ruta_temp)
+        
+        # 2. Lectura como en ORCHESTRATOR.py
+        t = dbf.Table(ruta_temp, codepage='cp1252')
+        t.open(mode=dbf.READ_ONLY)
+        fields = [f.upper() for f in t.field_names]
+        
+        campo_nombre = None
+        for c in ["INVNOM", "NOMBRE", "DESCRIP", "DESCRI", "DESCRIPCIO", "ARTNOM"]:
+            if c in fields:
+                campo_nombre = c
+                break
+                
+        if campo_nombre:
+            for r in t:
+                cod = str(r.INVCOD).strip().upper()
+                nom = str(getattr(r, campo_nombre)).strip()
+                if cod:
+                    _SETART_CACHE[cod] = nom
+        t.close()
+    except Exception as e:
+        print(f"Error cargando Nombres de SETART: {e}")
+    finally:
+        if os.path.exists(ruta_temp):
+            try: os.remove(ruta_temp)
+            except: pass
+            
+    return _SETART_CACHE
+
 # --- RUTAS GLOBALES ---
 
 @app.route('/')
@@ -67,17 +115,40 @@ def visor_remitos():
     # Nos conectamos a la base de datos de Clipper/Movimientos
     db_path = r'Z:\VENTAS\MOVSTK\stock_movimientos.db'
     
+    nombres_dict = _get_nombres_dict()
+    
     try:
         # Abrimos la conexión
         con = sqlite3.connect(db_path)
-        # Queremos que los resultados se comporten como diccionarios (para llamarlos como mov.remito en el HTML)
         con.row_factory = sqlite3.Row 
         cur = con.cursor()
         
         # Le pedimos todos los registros ordenados desde el más reciente (ID más grande) al más viejo
-        cur.execute("SELECT * FROM stock_movimientos_his ORDER BY id DESC")
-        movimientos = cur.fetchall()
+        cur.execute("SELECT * FROM stock_movimientos_his ORDER BY id DESC LIMIT 2000")
+        rows = cur.fetchall()
         
+        for row in rows:
+            mov = dict(row) # Convertimos a dict mutable
+            codigo = str(mov.get('invcod', '')).strip().upper()
+            mov['nombre'] = nombres_dict.get(codigo, "")
+            
+            # Acortar fecha (ej: "2026-02-23 17:16:03" a "23/02 17:16")
+            fecha_str = mov.get('fecha', '')
+            if fecha_str:
+                try:
+                    if ' ' in fecha_str:
+                        dt = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
+                        mov['fecha_corta'] = dt.strftime('%d/%m/%y %H:%M')
+                    else:
+                        dt = datetime.strptime(fecha_str, '%Y-%m-%d')
+                        mov['fecha_corta'] = dt.strftime('%d/%m/%y')
+                except Exception:
+                    mov['fecha_corta'] = fecha_str
+            else:
+                mov['fecha_corta'] = ""
+
+            movimientos.append(mov)
+            
         con.close()
     except Exception as e:
         print(f"Error al leer la base de datos de remitos: {e}")

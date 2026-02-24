@@ -39,7 +39,7 @@
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">ID</th>
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">Fecha</th>
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">Remito</th>
-                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Cod. Artículo</th>
+                    <th style="padding: 15px; font-weight: 600; color: #34495e;">Artículo (SKU y Nombre)</th>
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">Tipo</th>
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">Cant.</th>
                     <th style="padding: 15px; font-weight: 600; color: #34495e;">Destino / Cliente</th>
@@ -49,9 +49,12 @@
                 {% for mov in movimientos %}
                 <tr style="border-bottom: 1px solid #eee;">
                     <td style="padding: 12px 15px; color: #7f8c8d;">#{{ mov.id }}</td>
-                    <td style="padding: 12px 15px; font-weight: 500;">{{ mov.fecha }}</td>
+                    <td style="padding: 12px 15px; font-weight: 500;">{{ mov.fecha_corta }}</td>
                     <td style="padding: 12px 15px; font-weight: bold; color: #3498db;">{{ mov.remito }}</td>
-                    <td style="padding: 12px 15px; font-weight: bold;">{{ mov.invcod }}</td>
+                    <td style="padding: 12px 15px;">
+                        <span style="font-weight: bold; font-size: 1.05rem;">{{ mov.invcod }}</span><br>
+                        <span style="color: #7f8c8d; font-size: 0.9rem;">{{ mov.nombre }}</span>
+                    </td>
                     <td style="padding: 12px 15px;">
                         {% if mov.tipo == 'INGRESO' %}
                         <span
@@ -86,8 +89,12 @@
 
 <script>
     function filtrarTabla() {
-        const busqueda = document.getElementById('searchInput').value.toLowerCase();
+        const busqueda = document.getElementById('searchInput').value.trim().toLowerCase();
         const tipo = document.getElementById('tipoFiltro').value.toLowerCase();
+
+        // Separar la búsqueda en palabras, al igual que hace consulta_live.py
+        const palabrasBusqueda = busqueda.split(/\s+/).filter(Boolean);
+
         const filas = document.getElementById('tablaMovimientos').getElementsByTagName('tr');
 
         for (let i = 0; i < filas.length; i++) {
@@ -95,10 +102,16 @@
             if (fila.cells.length <= 1) continue; // Salta la fila de "Aún no hay movimientos..."
 
             const remito = fila.cells[2].textContent.toLowerCase();
+            // Al sumar la celda 3, incluimos el SKU y el Nombre del producto en la búsqueda.
             const articulo = fila.cells[3].textContent.toLowerCase();
             const tipoFila = fila.cells[4].textContent.trim().toLowerCase();
 
-            const coincideBusqueda = remito.includes(busqueda) || articulo.includes(busqueda);
+            // Lógica de consulta_live: TODAS las palabras deben coincidir en SKU, Nombre o Remito
+            let coincideBusqueda = true;
+            if (palabrasBusqueda.length > 0) {
+                coincideBusqueda = palabrasBusqueda.every(palabra => remito.includes(palabra) || articulo.includes(palabra));
+            }
+
             const coincideTipo = (tipo === "") || (tipoFila === tipo);
 
             if (coincideBusqueda && coincideTipo) {
